@@ -1,0 +1,29 @@
+# Unit-test the OPA state-safety policies on every change to policy/.
+name: policy-test
+
+on:
+  pull_request:
+    paths:
+      - "policy/**"
+      - ".github/workflows/policy-test.yml"
+  push:
+    branches: [main]
+    paths:
+      - "policy/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  opa-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: open-policy-agent/setup-opa@v2
+        with:
+          version: latest
+      - name: opa test
+        run: opa test policy/ -v

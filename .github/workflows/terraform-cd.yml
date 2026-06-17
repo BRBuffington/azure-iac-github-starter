@@ -1,0 +1,169 @@
+# CD: plan -> captured artifact -> OPA state-safety gate -> GATED apply.
+#
+# - push to main  => plan + gate (no apply) by default
+# - workflow_dispatch with apply=true => plan + gate + apply (apply runs in a
+#   protected GitHub Environment with required reviewers)
+#
+# The apply job targets the '<env>-apply' GitHub Environment — put your required
+# reviewers there so a human approves before any write to live infrastructure.
+name: terraform-cd
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "infra/**"
+      - "policy/**"
+      - ".github/workflows/terraform-cd.yml"
+  workflow_dispatch:
+    inputs:
+      config:
+        description: Config (tfvars basename under infra/configs/)
+        type: string
+        default: example-eus-dev
+      apply:
+        description: Apply after a clean plan (otherwise plan-only)
+        type: boolean
+        default: false
+      allow_recreate:
+        description: Override the OPA destroy/recreate guard (reviewed, intentional only)
+        type: boolean
+        default: false
+
+concurrency:
+  group: tf-cd-${{ github.ref }}-${{ inputs.config || 'example-eus-dev' }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    environment: ${{ vars.PLAN_ENVIRONMENT || 'dev' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: infra
+    env:
+      CONFIG: ${{ inputs.config || 'example-eus-dev' }}
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}      # least-priv: Reader + state read
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    outputs:
+      has_changes: ${{ steps.plan.outputs.has_changes }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Setup conftest (OPA)
+        run: |
+          set -euo pipefail
+          VER=0.56.0
+          curl -sSL "https://github.com/open-policy-agent/conftest/releases/download/v${VER}/conftest_${VER}_Linux_x86_64.tar.gz" | tar -xz -C /tmp conftest
+          sudo mv /tmp/conftest /usr/local/bin/conftest
+
+      - name: Compute backend key
+        id: bkey
+        env:
+          KEY_PREFIX: ${{ vars.TF_BACKEND_KEY_PREFIX }}
+        run: echo "key=${KEY_PREFIX}/${CONFIG}.tfstate" >> "$GITHUB_OUTPUT"
+
+      - name: OPA gate - backend key convention (pre-plan)
+        env:
+          BKEY: ${{ steps.bkey.outputs.key }}
+        run: |
+          set -euo pipefail
+          # Value comes from env (not an inline expression in the run body) so a
+          # caller-controlled config cannot inject shell.
+          printf '{"key": "%s"}' "$BKEY" > /tmp/bkey.json
+          conftest test /tmp/bkey.json --policy "${GITHUB_WORKSPACE}/policy" --namespace backend_key --no-color
+
+      - name: terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ steps.bkey.outputs.key }}" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+
+      - name: terraform plan
+        id: plan
+        run: |
+          set -euo pipefail
+          terraform plan -input=false -out="${CONFIG}.tfplan" -var-file="configs/${CONFIG}.tfvars" -detailed-exitcode || ec=$?
+          ec=${ec:-0}
+          case "$ec" in
+            0) echo "has_changes=false" >> "$GITHUB_OUTPUT" ;;
+            2) echo "has_changes=true"  >> "$GITHUB_OUTPUT" ;;
+            *) echo "::error::plan failed (exit $ec)"; exit "$ec" ;;
+          esac
+          terraform show -json "${CONFIG}.tfplan" > "${CONFIG}.tfplan.json"
+
+      - name: OPA gate - no unexpected destroy/recreate (post-plan)
+        run: |
+          set -euo pipefail
+          printf '{"allow_recreate": %s, "destroy_mode": false}' "${{ inputs.allow_recreate || 'false' }}" > /tmp/params.json
+          conftest test "${CONFIG}.tfplan.json" --policy "${GITHUB_WORKSPACE}/policy" --namespace main --data /tmp/params.json --no-color
+
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan-${{ env.CONFIG }}
+          path: |
+            infra/${{ env.CONFIG }}.tfplan
+            infra/${{ env.CONFIG }}.tfplan.json
+          retention-days: 5
+
+  apply:
+    needs: plan
+    # Apply ONLY on an explicit dispatch with apply=true AND a non-empty plan.
+    if: ${{ github.event_name == 'workflow_dispatch' && inputs.apply && needs.plan.outputs.has_changes == 'true' }}
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    environment: ${{ vars.PLAN_ENVIRONMENT || 'dev' }}-apply   # required reviewers live here
+    defaults:
+      run:
+        shell: bash
+        working-directory: infra
+    env:
+      CONFIG: ${{ inputs.config || 'example-eus-dev' }}
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_APPLY_CLIENT_ID }}     # least-priv: scoped write + state write
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Download plan artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: tfplan-${{ env.CONFIG }}
+          path: infra
+
+      - name: terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ vars.TF_BACKEND_KEY_PREFIX }}/${CONFIG}.tfstate" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+
+      - name: terraform apply (the reviewed plan)
+        run: terraform apply -input=false "${CONFIG}.tfplan"

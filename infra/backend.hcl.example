@@ -1,0 +1,20 @@
+# Backend config for LOCAL `terraform init -backend-config=backend.hcl`.
+# Copy to backend.hcl and fill in. In CI the same values come from GitHub
+# Environment variables (TF_BACKEND_* + use_azuread_auth/use_oidc) — see the
+# workflows. Do NOT commit a filled-in backend.hcl.
+#
+# Non-negotiables (do not remove):
+#   use_azuread_auth = true   # Entra auth; shared keys must be DISABLED on the SA
+#   use_oidc         = true   # federated identity; no client secret
+#
+# The key MUST be nested: "<prefix>/<scope>-<region>-<env>.tfstate" (one state
+# file per config). A flat key is the laptop-vs-CD divergence bug the OPA gate
+# rejects.
+
+resource_group_name  = "rg-tfstate-<yourorg>"
+storage_account_name = "sttfstate<yourorg>01"   # shared_access_key_enabled = false
+container_name       = "tfstate"
+key                  = "<prefix>/example-eus-dev.tfstate"
+use_azuread_auth     = true
+use_oidc             = true
+subscription_id      = "<state-subscription-guid>"

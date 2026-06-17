@@ -1,0 +1,72 @@
+# PR gate: format, validate, IaC security scan, and a speculative plan.
+# Runs on every pull request that touches infra/. Read-only — no apply, no state
+# writes beyond a speculative plan (which the plan identity is read-scoped for).
+name: terraform-validate
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "policy/**"
+      - ".github/workflows/terraform-*.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write   # OIDC to Azure
+  contents: read
+  pull-requests: write
+
+jobs:
+  validate:
+    # For a private-endpoint-only landing zone, run this on a SELF-HOSTED runner
+    # inside the VNet (see runners/README.md). Example label set shown; swap in
+    # 'ubuntu-latest' only while your state account is still publicly reachable.
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    strategy:
+      matrix:
+        # One entry per config you want validated on PR.
+        config: ["example-eus-dev"]
+    defaults:
+      run:
+        shell: bash
+        working-directory: infra
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_CLIENT_ID }}
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: IaC security scan (checkov)
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: infra
+          framework: terraform
+          quiet: true
+          soft_fail: false   # fail the PR on a policy violation; tune to your baseline
+
+      - name: terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ vars.TF_BACKEND_KEY_PREFIX }}/${{ matrix.config }}.tfstate" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform plan (speculative)
+        run: terraform plan -input=false -lock=false -var-file="configs/${{ matrix.config }}.tfvars"

@@ -1,0 +1,17 @@
+{
+  "//": "Agent config for the VS Code + GitHub Copilot Terraform authoring loop. These MCP servers give Copilot Chat authoritative Azure + Terraform grounding while you author IaC. Copy to .vscode/mcp.json. Requires `az login` for the Azure server. Keep the agent scoped to authoring/review — it is NOT in the apply path.",
+  "servers": {
+    "azure": {
+      "//": "Microsoft's official Azure MCP server: Microsoft Learn doc search, Azure best practices, Terraform-on-Azure guidance, resource queries.",
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure/mcp@latest", "server", "start"]
+    },
+    "terraform": {
+      "//": "HashiCorp Terraform MCP server: registry module/provider lookups, doc grounding for module authoring.",
+      "type": "stdio",
+      "command": "docker",
+      "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server"]
+    }
+  }
+}

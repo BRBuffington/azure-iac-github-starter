@@ -1,0 +1,71 @@
+# Azure Landing Zone — Terraform CI/CD Reference
+
+A clean, self-contained starting point for running **Terraform for an Azure Landing
+Zone through GitHub Actions**, hardened for a **private-endpoint-only, regulated
+(PHI / HIPAA / HITRUST) environment**.
+
+It encodes the decisions an Azure architecture review converged on for a health-system
+landing zone, with every pattern grounded in Microsoft's own guidance (Cloud Adoption
+Framework, Well-Architected Framework, Azure Verified Modules). Clone it, adapt the
+names, and you have a working, opinionated pipeline on day one.
+
+> This is a **reference / starter**, not a turnkey product. Replace the example names,
+> review every value against your own security baseline, and validate the Microsoft
+> Learn citations in `docs/architecture-decisions.md` before adopting.
+
+## What's in here
+
+| Path | What it is |
+|---|---|
+| `.github/workflows/terraform-validate.yml` | PR gate: `fmt`, `validate`, IaC security scan, speculative `plan`. |
+| `.github/workflows/terraform-cd.yml` | Push/dispatch: `plan` → captured artifact → **OPA state-safety gate** → **gated** `apply`. |
+| `.github/workflows/state-migrate.yml` | One-time, attended migration of a flat/laptop state file to the per-config CD key (Terraform-native, no Azure CLI needed). |
+| `policy/*.rego` | The **state-safety gate**: refuse a flat backend key, and block a plan that would rebuild a live stack. Unit-tested. |
+| `infra/` | Minimal Terraform skeleton + `backend.hcl.example` + `configs/<scope>-<region>-<env>.tfvars` naming. |
+| `runners/README.md` | The **self-hosted, in-VNet, ephemeral runner** pattern (the only way to reach private-endpoint state). |
+| `.vscode/mcp.json.example` | Agent config: the Terraform + Azure MCP servers for the VS Code + GitHub Copilot authoring loop. |
+| `.github/copilot-instructions.md` | Repo-scoped Copilot guidance so the agent writes Terraform that matches these conventions. |
+| `docs/architecture-decisions.md` | The cited decision record (runners, state, local plans, identity, agent platform). |
+| `docs/state-migration-runbook.md` | Step-by-step for the flat → per-config state migration. |
+
+## The decisions this repo encodes (one-liners — full rationale + citations in `docs/`)
+
+1. **Runners: self-hosted, in-VNet, ephemeral.** Once state / Key Vault / storage are
+   private-endpoint-only, GitHub-hosted runners cannot reach them. Container Apps jobs
+   with scale-to-zero are the cleanest fit.
+2. **Remote state: Azure Storage, Entra-auth, no keys, private-endpoint only**, with
+   versioning + native blob-lease locking, one state file **per layer per environment**.
+   Not a cross-cloud object store.
+3. **Local plans: read-only only, from an in-network workstation, under your own
+   least-privilege identity. No local `apply`, ever** — all authoritative plan + apply
+   run in the pipeline (the private-endpoint backend enforces this off-network).
+4. **Identity: OIDC workload-identity federation, no secrets.** Two least-privilege
+   identities per environment: a **plan** identity (Reader + state read) and an
+   **apply** identity (scoped write), gated behind a GitHub Environment with approvals.
+5. **State safety is a gate, not a hope.** Two OPA policies hard-fail the pipeline if
+   the backend key is flat or the plan looks like an empty-state rebuild.
+6. **Authoring: VS Code + GitHub Copilot + scoped MCP now; PR review native in GitHub.**
+   A centralized managed agent (Azure AI Foundry Agent Service, VNet-injected, scoped
+   Terraform-only, **advisory not approver**) is a deferred follow-on, after the
+   compliance boundary is proven.
+
+## Quick start
+
+```bash
+# 1. Create the remote-state storage account (Entra-auth, private endpoint) out of band.
+# 2. Render your backend config:
+cp infra/backend.hcl.example infra/backend.hcl   # then fill in your values
+# 3. Name your first config (env suffix LAST so *-prd.tfvars globs across regions):
+cp infra/configs/example-eus-dev.tfvars infra/configs/<scope>-<region>-<env>.tfvars
+# 4. Configure GitHub Environments (<env> + <env>-apply) with OIDC federated identities.
+# 5. Open a PR — terraform-validate runs. Merge — terraform-cd plans, gates, applies.
+```
+
+See `docs/architecture-decisions.md` for the why, and `runners/README.md` for the
+self-hosted runner setup that makes private-endpoint state reachable.
+
+## Provenance
+
+The CI/CD shape, the OPA state-safety policies, and the state-migration runbook are
+generalized from a production Azure Terraform fleet. Customer, tenant, and
+resource-specific identifiers have been stripped — every value here is a placeholder.

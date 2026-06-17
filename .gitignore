@@ -1,0 +1,21 @@
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.tfplan.json
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+
+# Backend config with real values (use backend.hcl.example as the template)
+infra/backend.hcl
+
+# Filled-in MCP config (use .vscode/mcp.json.example as the template)
+.vscode/mcp.json
+
+# Local env
+*.tfvars.local
+.env

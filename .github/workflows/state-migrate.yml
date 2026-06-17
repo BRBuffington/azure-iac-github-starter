@@ -1,0 +1,149 @@
+# ONE-TIME, ATTENDED state migration: copy a live Terraform state from a legacy
+# FLAT key (e.g. laptop-applied `<stack>.tfstate`) to the per-config CD key
+# (`<prefix>/<config>.tfstate`), so the pipeline plans against the REAL state
+# instead of an empty per-config blob.
+#
+# Why this exists: a stack stood up from a laptop BEFORE CI existed lands its
+# state in a flat key. The CD pipeline init's against `<prefix>/<config>.tfstate`
+# (per-config), which was never populated — so the first CD plan comes back as a
+# full rebuild ("N to add") on a live stack. This job migrates the state once.
+#
+# HOW (no Azure CLI required): uses Terraform's NATIVE backend migration
+# (`init -migrate-state -force-copy`) with the azurerm backend's OIDC support
+# (ARM_USE_OIDC + ARM_* env). This is the same auth the CD pipeline uses, so it
+# works on a self-hosted in-VNet runner that can reach a private-endpoint-only
+# state account — no `az` CLI, no public network flip.
+#
+# Safety: refuses an empty/garbage source (min_resources floor), refuses to
+# overwrite a non-empty destination unless explicitly allowed, uploads a state
+# backup artifact, and never deletes the source (Terraform copies).
+name: state-migrate
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_key:
+        description: Legacy state blob key to migrate FROM (e.g. stack.tfstate)
+        type: string
+        required: true
+      dest_key:
+        description: CD per-config state blob key to migrate TO (prefix/config.tfstate)
+        type: string
+        required: true
+      min_resources:
+        description: Minimum resource count expected in the source (sanity floor)
+        type: string
+        default: "5"
+      allow_overwrite_dest:
+        description: Overwrite the destination even if it already holds state (DANGER)
+        type: boolean
+        default: false
+
+concurrency:
+  group: state-migrate-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  migrate:
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    environment: ${{ vars.PLAN_ENVIRONMENT || 'dev' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: infra
+    env:
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_APPLY_CLIENT_ID }}   # needs state read+write
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      RG: ${{ vars.TF_BACKEND_RESOURCE_GROUP }}
+      SA: ${{ vars.TF_BACKEND_STORAGE_ACCOUNT }}
+      CONTAINER: ${{ vars.TF_BACKEND_CONTAINER }}
+      SRC_KEY: ${{ inputs.source_key }}
+      DST_KEY: ${{ inputs.dest_key }}
+      MIN_RES: ${{ inputs.min_resources }}
+      ALLOW_OVERWRITE: ${{ inputs.allow_overwrite_dest }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: Guard - destination must be empty (unless allow_overwrite_dest)
+        run: |
+          set -euo pipefail
+          terraform init -input=false -reconfigure \
+            -backend-config="resource_group_name=${RG}" \
+            -backend-config="storage_account_name=${SA}" \
+            -backend-config="container_name=${CONTAINER}" \
+            -backend-config="key=${DST_KEY}" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+          DCOUNT=$(terraform state list 2>/dev/null | wc -l | tr -d ' ')
+          echo "destination ${DST_KEY} holds ${DCOUNT} resources"
+          if [[ "$DCOUNT" -ge 1 && "$ALLOW_OVERWRITE" != "true" ]]; then
+            echo "::error::Destination ${DST_KEY} already holds state. Re-run with allow_overwrite_dest=true ONLY if you are sure."
+            exit 1
+          fi
+
+      - name: Init against legacy (source) key
+        run: |
+          set -euo pipefail
+          terraform init -input=false -reconfigure \
+            -backend-config="resource_group_name=${RG}" \
+            -backend-config="storage_account_name=${SA}" \
+            -backend-config="container_name=${CONTAINER}" \
+            -backend-config="key=${SRC_KEY}" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+
+      - name: Verify source is non-empty + back it up
+        run: |
+          set -euo pipefail
+          terraform state list || true
+          N=$(terraform state list | wc -l | tr -d ' ')
+          echo "source ${SRC_KEY} has ${N} resources (floor ${MIN_RES})"
+          if [[ "$N" -lt "$MIN_RES" ]]; then
+            echo "::error::Source ${SRC_KEY} has ${N} resources (< ${MIN_RES}). Refusing to migrate an empty/garbage state."
+            exit 1
+          fi
+          terraform state pull > "${RUNNER_TEMP}/source-state-backup.json"
+
+      - name: Upload source-state backup
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-state-backup
+          path: ${{ runner.temp }}/source-state-backup.json
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Migrate state to per-config (dest) key
+        run: |
+          set -euo pipefail
+          # Current backend is SRC. -migrate-state -force-copy copies SRC -> DST
+          # non-interactively. Terraform never deletes SRC (rollback preserved).
+          terraform init -input=false -migrate-state -force-copy \
+            -backend-config="resource_group_name=${RG}" \
+            -backend-config="storage_account_name=${SA}" \
+            -backend-config="container_name=${CONTAINER}" \
+            -backend-config="key=${DST_KEY}" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+
+      - name: Verify destination matches source
+        run: |
+          set -euo pipefail
+          N=$(terraform state list | wc -l | tr -d ' ')
+          echo "destination ${DST_KEY} now holds ${N} resources"
+          if [[ "$N" -lt "$MIN_RES" ]]; then
+            echo "::error::Destination has ${N} resources (< ${MIN_RES}) after migrate."
+            exit 1
+          fi
+          echo "Migration verified. Next: run terraform-cd (plan only) and confirm 'No changes'."

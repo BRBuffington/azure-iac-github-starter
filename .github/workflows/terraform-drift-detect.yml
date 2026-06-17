@@ -1,0 +1,76 @@
+# Scheduled drift detection: run a read-only plan against live state and alert if
+# the deployed infrastructure has drifted from the committed Terraform. Drift
+# happens when someone changes a resource in the portal or another tool; catching
+# it on a schedule keeps the IaC the source of truth.
+#
+# Uses the read-only PLAN identity (no apply, no mutation) and the same
+# Terraform-native OIDC auth as the rest of the pipeline, so it runs on the
+# self-hosted in-network runner with no Azure CLI required.
+name: terraform-drift-detect
+
+on:
+  schedule:
+    - cron: "0 7 * * 1"   # Mondays 07:00 UTC
+  workflow_dispatch:
+    inputs:
+      config:
+        description: Config (tfvars basename under infra/configs/)
+        type: string
+        default: example-eus-dev
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  drift:
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    environment: ${{ vars.PLAN_ENVIRONMENT || 'dev' }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: infra
+    env:
+      CONFIG: ${{ inputs.config || 'example-eus-dev' }}
+      ARM_USE_OIDC: "true"
+      ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}   # read-only plan identity
+      ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
+      ARM_SUBSCRIPTION_ID: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - name: terraform init
+        run: |
+          terraform init -input=false \
+            -backend-config="resource_group_name=${{ vars.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ vars.TF_BACKEND_KEY_PREFIX }}/${CONFIG}.tfstate" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+
+      - name: terraform plan (drift check)
+        id: drift
+        run: |
+          set -euo pipefail
+          # -detailed-exitcode: 0 = no drift, 2 = drift, 1 = error.
+          terraform plan -input=false -lock=false -detailed-exitcode \
+            -var-file="configs/${CONFIG}.tfvars" || ec=$?
+          ec=${ec:-0}
+          {
+            echo "## Drift check: ${CONFIG}"
+            echo ""
+          } >> "$GITHUB_STEP_SUMMARY"
+          case "$ec" in
+            0) echo "No drift detected." >> "$GITHUB_STEP_SUMMARY" ;;
+            2) echo "::warning::Drift detected in ${CONFIG} — live infrastructure differs from committed Terraform."
+               echo "DRIFT DETECTED — review the plan above. Open a PR to reconcile (codify the change) or revert the out-of-band change." >> "$GITHUB_STEP_SUMMARY"
+               exit 1 ;;
+            *) echo "::error::drift plan failed (exit $ec)"; exit "$ec" ;;
+          esac

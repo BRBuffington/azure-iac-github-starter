@@ -109,11 +109,32 @@ jobs:
           esac
           terraform show -json "${CONFIG}.tfplan" > "${CONFIG}.tfplan.json"
 
-      - name: OPA gate - no unexpected destroy/recreate (post-plan)
+      - name: OPA gate - state safety + governance (post-plan)
+        env:
+          # Per-run override comes through env (not an inline expression in the
+          # run body) so a caller-controlled input cannot inject shell.
+          ALLOW_RECREATE: ${{ inputs.allow_recreate && 'true' || 'false' }}
         run: |
           set -euo pipefail
-          printf '{"allow_recreate": %s, "destroy_mode": false}' "${{ inputs.allow_recreate || 'false' }}" > /tmp/params.json
-          conftest test "${CONFIG}.tfplan.json" --policy "${GITHUB_WORKSPACE}/policy" --namespace main --data /tmp/params.json --no-color
+          # Merge the committed governance config (policy/governance.params.json)
+          # with the per-run state-safety flags into ONE file named params.json,
+          # so every policy resolves its config from data.params. conftest
+          # namespaces a --data file by its basename, so the file MUST be
+          # params.json for `data.params.*` to resolve.
+          python3 - "$ALLOW_RECREATE" <<'PY'
+          import json, sys, os
+          gov = json.load(open(os.path.join(os.environ["GITHUB_WORKSPACE"], "policy", "governance.params.json")))
+          gov = {k: v for k, v in gov.items() if not k.startswith("//")}
+          gov["allow_recreate"] = sys.argv[1] == "true"
+          gov["destroy_mode"] = False
+          json.dump(gov, open("/tmp/params.json", "w"))
+          PY
+          # Evaluate both the state-safety (package main) and governance
+          # (package governance) namespaces in one pass.
+          conftest test "${CONFIG}.tfplan.json" \
+            --policy "${GITHUB_WORKSPACE}/policy" \
+            --namespace main --namespace governance \
+            --data /tmp/params.json --no-color
 
       - name: Upload plan artifact
         uses: actions/upload-artifact@v4

@@ -1,0 +1,22 @@
+{
+  "//": "Governance guardrail config for the OPA `governance` package, passed to conftest via --data. Each guardrail is INERT until you populate its parameter, so this ships safe-by-default: copy the examples in the comments into real values to turn a guardrail on. The state-safety policies (backend_key, no_unexpected_destroy) are separate and always on.",
+
+  "//allowed_regions": "Data residency. List the Azure regions resources may target; empty = no restriction. Example: [\"eastus\", \"eastus2\"]",
+  "allowed_regions": [],
+
+  "//required_tags": "CAF tagging governance, enforced on the types in tag_enforced_types. Empty = off. Example: [\"environment\", \"owner\", \"data_classification\"]",
+  "required_tags": [],
+  "tag_enforced_types": ["azurerm_resource_group"],
+  "//tag_allowed_values": "Optional per-tag allowed-value validation. Example: {\"environment\": [\"dev\", \"tst\", \"prd\"]}",
+  "tag_allowed_values": {},
+
+  "//allowed_subs_per_env": "Deploy-to-wrong-subscription guard. Set `environment` to the env this run targets and map each env to its approved subscription GUIDs. Absent env key or empty list = inert.",
+  "environment": "",
+  "allowed_subs_per_env": {},
+
+  "//enforce_private_network": "Require public network access disabled (private-endpoint posture). Default true. Set false to allow public access (not recommended for regulated workloads).",
+  "enforce_private_network": true,
+
+  "//enforce_secure_transport": "Require storage HTTPS-only + TLS 1.2+. Default true.",
+  "enforce_secure_transport": true
+}

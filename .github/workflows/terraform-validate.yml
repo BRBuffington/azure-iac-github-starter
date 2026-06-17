@@ -68,5 +68,29 @@ jobs:
       - name: terraform validate
         run: terraform validate
 
-      - name: terraform plan (speculative)
-        run: terraform plan -input=false -lock=false -var-file="configs/${{ matrix.config }}.tfvars"
+      - name: Setup conftest (OPA)
+        shell: bash
+        run: |
+          set -euo pipefail
+          VER=0.56.0
+          curl -sSL "https://github.com/open-policy-agent/conftest/releases/download/v${VER}/conftest_${VER}_Linux_x86_64.tar.gz" | tar -xz -C /tmp conftest
+          sudo mv /tmp/conftest /usr/local/bin/conftest
+
+      - name: terraform plan (speculative) + governance gate
+        run: |
+          set -euo pipefail
+          terraform plan -input=false -lock=false -out=pr.tfplan -var-file="configs/${{ matrix.config }}.tfvars"
+          terraform show -json pr.tfplan > pr.tfplan.json
+          # Shift-left: run the governance guardrails on the PR plan so violations
+          # surface in review, not at apply. State-safety (package main) is
+          # enforced in CD; here we evaluate governance with allow_recreate off.
+          python3 - <<'PY'
+          import json, os
+          gov = json.load(open(os.path.join(os.environ["GITHUB_WORKSPACE"], "policy", "governance.params.json")))
+          gov = {k: v for k, v in gov.items() if not k.startswith("//")}
+          json.dump(gov, open("/tmp/params.json", "w"))
+          PY
+          conftest test pr.tfplan.json \
+            --policy "${GITHUB_WORKSPACE}/policy" \
+            --namespace governance \
+            --data /tmp/params.json --no-color

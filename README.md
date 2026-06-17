@@ -17,15 +17,20 @@ names, and you have a working, opinionated pipeline on day one.
 
 | Path | What it is |
 |---|---|
-| `.github/workflows/terraform-validate.yml` | PR gate: `fmt`, `validate`, IaC security scan, speculative `plan`. |
-| `.github/workflows/terraform-cd.yml` | Push/dispatch: `plan` → captured artifact → **OPA state-safety gate** → **gated** `apply`. |
+| `.github/workflows/terraform-validate.yml` | PR gate: `fmt`, `validate`, IaC security scan, speculative `plan`, **governance guardrails**. |
+| `.github/workflows/terraform-cd.yml` | Push/dispatch: `plan` → captured artifact → **OPA state-safety + governance gate** → **gated** `apply`. |
+| `.github/workflows/terraform-drift-detect.yml` | Scheduled read-only plan that alerts when live infrastructure drifts from the committed Terraform. |
 | `.github/workflows/state-migrate.yml` | One-time, attended migration of a flat/laptop state file to the per-config CD key (Terraform-native, no Azure CLI needed). |
-| `policy/*.rego` | The **state-safety gate**: refuse a flat backend key, and block a plan that would rebuild a live stack. Unit-tested. |
+| `.github/workflows/policy-test.yml` | Runs the OPA policy unit tests on every change to `policy/`. |
+| `.github/CODEOWNERS` | Required-reviewer governance — the human gate on infra and policy changes. |
+| `policy/*.rego` | **State-safety gate** (flat-key + rebuild guards) **and a governance pack** (regions, tags, subscriptions, network, transport). All unit-tested (39 tests). |
+| `policy/governance.params.json` | Client-editable config that turns each governance guardrail on/off and scopes it. |
 | `infra/` | Minimal Terraform skeleton + `backend.hcl.example` + `configs/<scope>-<region>-<env>.tfvars` naming. |
 | `runners/README.md` | The **self-hosted, in-VNet, ephemeral runner** pattern (the only way to reach private-endpoint state). |
 | `.vscode/mcp.json.example` | Agent config: the Terraform + Azure MCP servers for the VS Code + GitHub Copilot authoring loop. |
 | `.github/copilot-instructions.md` | Repo-scoped Copilot guidance so the agent writes Terraform that matches these conventions. |
 | `docs/architecture-decisions.md` | The cited decision record (runners, state, local plans, identity, agent platform). |
+| `docs/policy-guardrails.md` | What each OPA policy checks, how to configure it, and how to add your own. |
 | `docs/state-migration-runbook.md` | Step-by-step for the flat → per-config state migration. |
 
 ## The decisions this repo encodes (one-liners — full rationale + citations in `docs/`)

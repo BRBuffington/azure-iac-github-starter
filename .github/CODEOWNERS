@@ -1,0 +1,19 @@
+# Code ownership and required-reviewer governance. GitHub requires a review from
+# a matching owner before a PR can merge when branch protection has
+# "Require review from Code Owners" enabled — the human gate on infrastructure
+# change. Replace the placeholder team/handles with your own.
+#
+# Format: <path pattern>   <owner> [<owner> ...]
+
+# Default owner for everything.
+*                       @your-org/platform-engineering
+
+# Pipeline, policy, and agent config are higher-trust — require the platform team.
+/.github/                @your-org/platform-engineering
+/policy/                 @your-org/platform-engineering @your-org/security
+/infra/backend.hcl.example   @your-org/platform-engineering
+
+# Security guardrails: require a security review on any policy change.
+/policy/deny_public_network_access.rego   @your-org/security
+/policy/require_secure_transport.rego     @your-org/security
+/policy/allowed_subs_per_env.rego         @your-org/security

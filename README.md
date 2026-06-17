@@ -20,6 +20,7 @@ names, and you have a working, opinionated pipeline on day one.
 | `.github/workflows/terraform-validate.yml` | PR gate: `fmt`, `validate`, IaC security scan, speculative `plan`, **governance guardrails**. |
 | `.github/workflows/terraform-cd.yml` | Push/dispatch: `plan` → captured artifact → **OPA state-safety + governance gate** → **gated** `apply`. |
 | `.github/workflows/terraform-drift-detect.yml` | Scheduled read-only plan that alerts when live infrastructure drifts from the committed Terraform. |
+| `.github/workflows/foundry-iq-sync.yml` | Optional: sync this repo's docs + policies to an Azure Blob container so a Foundry IQ knowledge source can ground an agent on them. Inert until configured. |
 | `.github/workflows/state-migrate.yml` | One-time, attended migration of a flat/laptop state file to the per-config CD key (Terraform-native, no Azure CLI needed). |
 | `.github/workflows/policy-test.yml` | Runs the OPA policy unit tests on every change to `policy/`. |
 | `.github/CODEOWNERS` | Required-reviewer governance — the human gate on infra and policy changes. |
@@ -31,6 +32,7 @@ names, and you have a working, opinionated pipeline on day one.
 | `.github/copilot-instructions.md` | Repo-scoped Copilot guidance so the agent writes Terraform that matches these conventions. |
 | `docs/architecture-decisions.md` | The cited decision record (runners, state, local plans, identity, agent platform). |
 | `docs/policy-guardrails.md` | What each OPA policy checks, how to configure it, and how to add your own. |
+| `docs/foundry-iq.md` | How to ground an AI agent on this repo via a Foundry IQ knowledge base (repo → blob → knowledge source → agent). |
 | `docs/state-migration-runbook.md` | Step-by-step for the flat → per-config state migration. |
 
 ## The decisions this repo encodes (one-liners — full rationale + citations in `docs/`)

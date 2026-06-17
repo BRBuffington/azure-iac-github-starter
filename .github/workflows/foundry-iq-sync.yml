@@ -1,0 +1,83 @@
+# Sync this repo's knowledge content (docs + policies) to an Azure Blob container
+# so a Foundry IQ Azure Blob knowledge source can index it for agent grounding.
+# See docs/foundry-iq.md for the full repo -> blob -> knowledge source -> agent path.
+#
+# INERT until configured: the job only runs when the repo variable
+# FOUNDRY_IQ_BLOB_ACCOUNT is set. Set these repo (or Environment) variables to turn
+# it on:
+#   AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID  (OIDC identity with
+#       Storage Blob Data Contributor on the target container)
+#   FOUNDRY_IQ_BLOB_ACCOUNT     storage account name
+#   FOUNDRY_IQ_BLOB_CONTAINER   container name (e.g. "repo-knowledge")
+#   RUNNER_LABELS               (regulated/private-endpoint blob) a self-hosted
+#       in-network runner label set; omit to use ubuntu-latest for a public blob.
+#
+# Foundry IQ's blob knowledge source handles chunking, embeddings, and the indexer
+# schedule. This workflow only keeps the blob content current; the knowledge source
+# refreshes on its own schedule (or trigger an indexer run in the portal/REST).
+name: foundry-iq-sync
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "README.md"
+      - "docs/**"
+      - "policy/**"
+      - ".github/workflows/foundry-iq-sync.yml"
+  workflow_dispatch:
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  sync:
+    # Only run when a target storage account is configured.
+    if: ${{ vars.FOUNDRY_IQ_BLOB_ACCOUNT != '' }}
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Stage knowledge content
+        run: |
+          set -euo pipefail
+          # Publish a curated set (not the whole repo): the human-readable guidance
+          # and the policy sources. Adjust to taste.
+          mkdir -p _kb/docs _kb/policy
+          cp README.md _kb/README.md
+          cp -r docs/* _kb/docs/ 2>/dev/null || true
+          # Ship .rego/.json as .txt so the indexer treats them as plain text.
+          for f in policy/*.rego policy/*.json; do
+            [ -e "$f" ] && cp "$f" "_kb/policy/$(basename "$f").txt"
+          done
+          echo "Staged files:"; find _kb -type f | sort
+
+      - name: Azure login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Sync to blob container
+        env:
+          SA: ${{ vars.FOUNDRY_IQ_BLOB_ACCOUNT }}
+          CONTAINER: ${{ vars.FOUNDRY_IQ_BLOB_CONTAINER }}
+        run: |
+          set -euo pipefail
+          # `az storage blob sync` mirrors the staging dir to the container and
+          # removes blobs that no longer exist in the repo. --auth-mode login uses
+          # the federated identity from azure/login (Storage Blob Data Contributor).
+          az storage blob sync \
+            --account-name "$SA" \
+            --container "${CONTAINER:-repo-knowledge}" \
+            --source _kb \
+            --auth-mode login
+          echo "Synced _kb -> ${SA}/${CONTAINER:-repo-knowledge}."
+          echo "Foundry IQ's blob knowledge source will index the new content on its schedule."

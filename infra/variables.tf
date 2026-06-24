@@ -28,3 +28,9 @@ variable "tags" {
   description = "Resource tags."
   default     = {}
 }
+
+variable "deployed_by_repo" {
+  type        = string
+  description = "Owning repository (owner/name), recorded as the DeployedByRepo provenance tag. CI sets this from github.repository; the default covers off-pipeline (local read-only) runs."
+  default     = "local"
+}

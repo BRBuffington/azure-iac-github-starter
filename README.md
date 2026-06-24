@@ -27,6 +27,7 @@ names, and you have a working, opinionated pipeline on day one.
 | `policy/*.rego` | **State-safety gate** (flat-key + rebuild guards) **and a governance pack** (regions, tags, subscriptions, network, transport). All unit-tested (39 tests). |
 | `policy/governance.params.json` | Client-editable config that turns each governance guardrail on/off and scopes it. |
 | `infra/` | Minimal Terraform skeleton + `backend.hcl.example` + `configs/<scope>-<region>-<env>.tfvars` naming. |
+| `infra/locals.tf` | **Provenance tags** — `DeployedByRepo` (from `github.repository`) on every resource via `local.common_tags`, plus a `LastApplied` stamp the CD job writes post-apply. Lets an agent (or you, weeks later) trace what deployed a resource and when. |
 | `runners/README.md` | The **self-hosted, in-VNet, ephemeral runner** pattern (the only way to reach private-endpoint state). |
 | `.vscode/mcp.json.example` | Agent config: the Terraform + Azure MCP servers for the VS Code + GitHub Copilot authoring loop. |
 | `.github/copilot-instructions.md` | Repo-scoped Copilot guidance so the agent writes Terraform that matches these conventions. |
@@ -55,6 +56,11 @@ names, and you have a working, opinionated pipeline on day one.
    A centralized managed agent (Azure AI Foundry Agent Service, VNet-injected, scoped
    Terraform-only, **advisory not approver**) is a deferred follow-on, after the
    compliance boundary is proven.
+7. **Provenance is a tag, not a memory.** Every resource carries `DeployedByRepo`
+   (from `github.repository`) and a post-apply `LastApplied` stamp, so an agent — or a
+   human weeks later — can answer "what deployed this, and when?" off the resource
+   itself, with no state access. `LastApplied` is stamped by CI and excluded from the
+   plan via `ignore_changes`, so it never churns a diff.
 
 ## Quick start
 

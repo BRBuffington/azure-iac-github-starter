@@ -48,6 +48,7 @@ jobs:
         working-directory: infra
     env:
       CONFIG: ${{ inputs.config || 'example-eus-dev' }}
+      DEPLOYED_BY_REPO: ${{ github.repository }}            # provenance: written into common_tags
       ARM_USE_OIDC: "true"
       ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}      # least-priv: Reader + state read
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
@@ -100,7 +101,7 @@ jobs:
         id: plan
         run: |
           set -euo pipefail
-          terraform plan -input=false -out="${CONFIG}.tfplan" -var-file="configs/${CONFIG}.tfvars" -detailed-exitcode || ec=$?
+          terraform plan -input=false -out="${CONFIG}.tfplan" -var-file="configs/${CONFIG}.tfvars" -var="deployed_by_repo=${DEPLOYED_BY_REPO}" -detailed-exitcode || ec=$?
           ec=${ec:-0}
           case "$ec" in
             0) echo "has_changes=false" >> "$GITHUB_OUTPUT" ;;
@@ -188,3 +189,38 @@ jobs:
 
       - name: terraform apply (the reviewed plan)
         run: terraform apply -input=false "${CONFIG}.tfplan"
+
+      # Stamp LastApplied=<UTC date> on this stack's resources, in the same
+      # already-approved apply job (no second environment gate). Kept OUT of
+      # Terraform so it reflects only on apply, never on plan (resources carry
+      # ignore_changes = [tags["LastApplied"]]). Resources are found by the
+      # TF-managed DeployedByRepo tag (= github.repository), so no state access
+      # is needed; no-op until your resources carry the tag. The apply identity
+      # needs tag-write (e.g. Tag Contributor) on the stamped resources.
+      - name: Azure login (OIDC, apply identity) for the tag stamp
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_APPLY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Stamp LastApplied on stack resources
+        env:
+          # Value via env (not an inline expression in the run body) so nothing
+          # is interpolated into the shell. github.repository = DeployedByRepo.
+          DEPLOYED_BY_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          command -v az >/dev/null 2>&1 || (curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash)
+          DATE=$(date -u +%F)
+          mapfile -t IDS < <(az resource list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[].id" -o tsv)
+          echo "Stamping LastApplied=$DATE on ${#IDS[@]} resources tagged DeployedByRepo=${DEPLOYED_BY_REPO}"
+          for id in "${IDS[@]}"; do
+            [ -z "$id" ] && continue
+            # Guard per-resource: an untaggable resource type (or a transient
+            # error) must not abort the whole stamp under `set -e`.
+            if az tag update --resource-id "$id" --operation Merge --tags "LastApplied=$DATE" --only-show-errors >/dev/null 2>&1; then
+              echo "  stamped $id"
+            else
+              echo "  skipped $id (untaggable or transient error)"
+            fi
+          done

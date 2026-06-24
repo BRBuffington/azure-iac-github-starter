@@ -213,7 +213,13 @@ jobs:
           DEPLOYED_BY_REPO: ${{ github.repository }}
         run: |
           set -euo pipefail
-          command -v az >/dev/null 2>&1 || (curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash)
+          # Azure CLI ships on GitHub-hosted ubuntu runners. Fail closed on a
+          # self-hosted runner that lacks it rather than piping an unpinned
+          # remote installer into sudo (supply-chain posture for regulated envs).
+          if ! command -v az >/dev/null 2>&1; then
+            echo "::error::Azure CLI not found. GitHub-hosted ubuntu runners include it; on a self-hosted runner install it first (https://learn.microsoft.com/cli/azure/install-azure-cli)."
+            exit 1
+          fi
           DATE=$(date -u +%F)
           # Scope by DeployedByRepo (az --tag) AND DeployedConfig (JMESPath).
           # Two discovery calls: `az resource list` returns resources but NOT
@@ -223,13 +229,27 @@ jobs:
             az group list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv || true
           )
           echo "Stamping LastApplied=$DATE on ${#IDS[@]} resources/groups (DeployedByRepo=${DEPLOYED_BY_REPO}, DeployedConfig=${CONFIG})"
+          STAMPED=0
+          FAILED=0
           for id in "${IDS[@]}"; do
             [ -z "$id" ] && continue
-            # Guard per-resource: an untaggable resource type (or a transient
-            # error) must not abort the whole stamp under `set -e`.
+            # Per-resource guard: an untaggable resource type (or a transient
+            # error) must not abort the whole stamp under `set -e`. Failures are
+            # surfaced as warning annotations, never silently swallowed.
             if az tag update --resource-id "$id" --operation Merge --tags "LastApplied=$DATE" --only-show-errors >/dev/null 2>&1; then
               echo "  stamped $id"
+              STAMPED=$((STAMPED + 1))
             else
-              echo "  skipped $id (untaggable or transient error)"
+              echo "::warning::LastApplied stamp failed for $id (untaggable type, resource lock, or the apply identity lacks Tag Contributor)."
+              FAILED=$((FAILED + 1))
             fi
           done
+          echo "LastApplied stamp summary: ${STAMPED} stamped, ${FAILED} failed (config=${CONFIG})."
+          # Individual failures are tolerated (the infra apply already
+          # succeeded), but if there were targets and EVERY stamp failed that is
+          # a systemic problem (usually a missing Tag Contributor role) and must
+          # fail the step rather than go green having written zero provenance.
+          if [ "${FAILED}" -gt 0 ] && [ "${STAMPED}" -eq 0 ]; then
+            echo "::error::All ${FAILED} LastApplied stamp(s) failed - the apply identity likely lacks the Tag Contributor role on the target scope."
+            exit 1
+          fi

@@ -34,3 +34,9 @@ variable "deployed_by_repo" {
   description = "Owning repository (owner/name), recorded as the DeployedByRepo provenance tag. CI sets this from github.repository; the default covers off-pipeline (local read-only) runs."
   default     = "local"
 }
+
+variable "deployed_config" {
+  type        = string
+  description = "The tfvars config basename (<scope>-<region>-<env>) being applied, recorded as the DeployedConfig provenance tag. Lets the post-apply LastApplied stamp scope to THIS config's resources, not every config the repo owns. CI sets it from the matrix config; default covers local runs."
+  default     = "local"
+}

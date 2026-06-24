@@ -17,7 +17,7 @@ names, and you have a working, opinionated pipeline on day one.
 
 | Path | What it is |
 |---|---|
-| `.github/workflows/terraform-validate.yml` | PR gate: `fmt`, `validate`, IaC security scan, speculative `plan`, **governance guardrails**. |
+| `.github/workflows/terraform-validate.yml` | PR gate: `fmt`, `validate` (backend-free, so a template clone is green), IaC security scan; plus a speculative `plan` + **governance guardrails** when a backend is configured. |
 | `.github/workflows/terraform-cd.yml` | Push/dispatch: `plan` → captured artifact → **OPA state-safety + governance gate** → **gated** `apply`. |
 | `.github/workflows/terraform-drift-detect.yml` | Scheduled read-only plan that alerts when live infrastructure drifts from the committed Terraform. |
 | `.github/workflows/foundry-iq-sync.yml` | Optional: sync this repo's docs + policies to an Azure Blob container so a Foundry IQ knowledge source can ground an agent on them. Inert until configured. |

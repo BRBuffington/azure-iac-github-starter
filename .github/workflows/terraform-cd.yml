@@ -215,10 +215,14 @@ jobs:
           set -euo pipefail
           command -v az >/dev/null 2>&1 || (curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash)
           DATE=$(date -u +%F)
-          # Scope by DeployedByRepo (az --tag) AND DeployedConfig (JMESPath) so
-          # only this config's resources are stamped.
-          mapfile -t IDS < <(az resource list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv)
-          echo "Stamping LastApplied=$DATE on ${#IDS[@]} resources (DeployedByRepo=${DEPLOYED_BY_REPO}, DeployedConfig=${CONFIG})"
+          # Scope by DeployedByRepo (az --tag) AND DeployedConfig (JMESPath).
+          # Two discovery calls: `az resource list` returns resources but NOT
+          # resource groups, so RGs are listed separately via `az group list`.
+          mapfile -t IDS < <(
+            az resource list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv || true
+            az group list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv || true
+          )
+          echo "Stamping LastApplied=$DATE on ${#IDS[@]} resources/groups (DeployedByRepo=${DEPLOYED_BY_REPO}, DeployedConfig=${CONFIG})"
           for id in "${IDS[@]}"; do
             [ -z "$id" ] && continue
             # Guard per-resource: an untaggable resource type (or a transient

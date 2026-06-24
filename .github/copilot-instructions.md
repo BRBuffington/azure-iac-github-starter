@@ -21,6 +21,25 @@ conventions. (GitHub Copilot reads `.github/copilot-instructions.md` automatical
 - **Secrets:** source from Key Vault at runtime; never hard-code. Remember Terraform
   state stores values in plain text — don't put secrets in outputs or PR comments.
 
+## Operating discipline (how to work, not just what to write)
+
+- **Plan first.** For anything non-trivial, interview the user for the unknowns,
+  then show the plan before you act. Never jump straight to `apply` — `plan` is a
+  separate, reviewed step and the pipeline enforces that.
+- **One change at a time.** Atomic commits; one feature per PR. Don't bundle
+  unrelated changes — a small reviewable diff is the whole point of the gate.
+- **Provenance is mandatory.** Every resource carries `DeployedByRepo` (via
+  `local.common_tags`) and `lifecycle { ignore_changes = [tags["LastApplied"]] }`
+  so the deployment is traceable and the post-apply stamp doesn't churn the plan.
+- **Destroys stop.** Any plan that destroys or replaces a live resource halts for
+  human review — the OPA state-safety gate fails it. Never set `allow_recreate`
+  yourself; that is a human's call.
+- **Decide once, then don't re-litigate.** Before making an architectural choice,
+  read `docs/architecture-decisions.md` and `DECISIONS.md`. If a decision already
+  covers it, follow it. When you make a new durable decision — or hit a gotcha
+  worth not repeating — append it to `DECISIONS.md` so the next session inherits it
+  instead of rediscovering it.
+
 ## What to do
 
 - When asked to add a resource, suggest the AVM module first, wired to the existing

@@ -75,7 +75,18 @@ The council ships advisory. To let a `BLOCK` actually stop a merge:
 1. Set the `COUNCIL_BLOCKING` variable to `true` (a `BLOCK` verdict then fails
    the `llm-council` check).
 2. In branch protection for `main`, add `llm-council` to the **required status
-   checks**.
+   checks**, and enable **Require review from Code Owners** + **Require branches
+   to be up to date before merging**.
+3. Keep `CODEOWNERS` covering `/.github/` — the shipped `CODEOWNERS` already does.
+
+**Why step 3 is not optional:** a required check runs the *PR's own* copy of
+`.github/scripts/llm-council.py`, so without protection a pull request could edit
+the script to always pass and bypass the very gate it is supposed to enforce.
+This caveat applies to **any** in-repo required check (terraform-validate,
+policy-test, etc.), not just this one. `CODEOWNERS` on `/.github/` closes it: a PR
+that touches the council's own workflow or script cannot merge without a Code
+Owner's review, so the gate can't be silently neutered. Treat blocking mode as
+defense-in-depth *behind* the human gate, never as a standalone control.
 
 Keep `CODEOWNERS` as the human gate regardless — the council is a second
 opinion, not a replacement for review.

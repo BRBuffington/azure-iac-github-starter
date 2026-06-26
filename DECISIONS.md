@@ -29,14 +29,15 @@ deep-checks the embedded `run:` scripts.
 Things that bit us once. Each: the symptom, then the rule that prevents it.
 
 ### A CD apply gate flipped by a null-coalesced plan-only input
-**Symptom:** an apply gate written as `plan_only: ${{ inputs.plan_only != false }}`
-silently turns push-to-main into an APPLY — on a push the input is null and GitHub
-coerces `null != false` to true; the mirror shape `${{ inputs.plan_only == null &&
-true || inputs.plan_only }}` silently turns a dispatch-to-apply into a no-op.
+**Symptom:** an apply gate that derives "apply vs plan" from a nullable
+`plan_only` dispatch input via a loose comparison silently misfires. On a push the
+input is null, and GitHub's loose equality coerces null against a boolean: a gate
+that reads the flag with a not-equal-false test flips push-to-main into an APPLY,
+and its null-coalescing mirror turns a dispatch-to-apply into a no-op.
 **Rule:** gate apply on the EVENT plus an explicit boolean
 (`github.event_name == 'workflow_dispatch' && inputs.apply && ...`), never on a
-null-coalesced `plan_only` expression (see the `apply` job in `terraform-cd.yml`),
-and lint workflows in CI (`workflow-lint.yml`) so expression footguns surface in review.
+nullable `plan_only` expression (see the `apply` job in `terraform-cd.yml`), and
+lint workflows in CI (`workflow-lint.yml`) so expression footguns surface in review.
 
 ### The agent re-created infrastructure it had already deployed
 **Symptom:** the agent couldn't find a resource it built weeks earlier and

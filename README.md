@@ -31,6 +31,7 @@ names, and you have a working, opinionated pipeline on day one.
 | `runners/README.md` | The **self-hosted, in-VNet, ephemeral runner** pattern (the only way to reach private-endpoint state). |
 | `.vscode/mcp.json.example` | Agent config: the Terraform + Azure MCP servers for the VS Code + GitHub Copilot authoring loop. |
 | `.github/copilot-instructions.md` | Repo-scoped Copilot guidance so the agent writes Terraform that matches these conventions. |
+| `DECISIONS.md` | A living, append-only decisions + learned-guardrails log the agent reads **before** choosing, so a decision is made once — not re-litigated each session. |
 | `docs/architecture-decisions.md` | The cited decision record (runners, state, local plans, identity, agent platform). |
 | `docs/policy-guardrails.md` | What each OPA policy checks, how to configure it, and how to add your own. |
 | `docs/foundry-iq.md` | How to ground an AI agent on this repo via a Foundry IQ knowledge base (repo → blob → knowledge source → agent). |

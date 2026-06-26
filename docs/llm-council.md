@@ -106,11 +106,21 @@ accordingly:
   which expires with the run.
 - **External-provider keys are an explicit opt-in.** `COUNCIL_API_KEY` is left
   commented out in the workflow on purpose — wiring a *standing* provider secret
-  exposes it to the (same-repo) PR-controlled script. If you use OpenAI / Azure
-  OpenAI / Anthropic, store the key in a **GitHub Environment with required
-  reviewers** so its release is gated by a human, and keep `CODEOWNERS` on
-  `.github/` so changes to the council script itself are reviewed before they
-  run.
+  exposes it to the (same-repo) PR-controlled script. To use OpenAI / Azure
+  OpenAI / Anthropic securely:
+  1. Create a **GitHub Environment** (e.g. `llm-council`) holding the
+     `COUNCIL_API_KEY` secret with **required reviewers**, so the key is released
+     only after a human approves the run.
+  2. In `llm-council.yml`, uncomment **both** the `environment:` binding on the
+     job **and** the `COUNCIL_API_KEY:` line — an Environment secret only resolves
+     in a job that declares `environment:`, so the binding is required, not
+     optional.
+  3. Keep `CODEOWNERS` on `/.github/` so changes to the council's own workflow or
+     script are reviewed before they run.
+
+  A plain repo/org secret also works *without* the `environment:` binding, but it
+  is exposed to PR-controlled code on same-repo PRs — prefer the protected
+  Environment.
 
 ## Data-governance note (read this for regulated / PHI environments)
 

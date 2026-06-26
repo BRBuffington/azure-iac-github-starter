@@ -39,6 +39,12 @@ jobs:
     # ever runs with this job's token).
     if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    # For an EXTERNAL provider whose key lives in a PROTECTED GitHub Environment
+    # (recommended over a plain repo secret — see docs/llm-council.md), uncomment
+    # this binding AND the COUNCIL_API_KEY line below, then create an Environment
+    # of this name with the secret + required reviewers. An Environment secret
+    # only resolves in a job that declares `environment:`.
+    # environment: llm-council
     steps:
       - uses: actions/checkout@v4
         with:
@@ -70,6 +76,7 @@ jobs:
           # The default provider (GitHub Models) uses only the scoped, ephemeral
           # GITHUB_TOKEN above — no standing secret. To use OpenAI / Azure OpenAI
           # / Anthropic, read "Security — secret handling" in docs/llm-council.md,
-          # store the key in a PROTECTED GitHub Environment, and uncomment:
+          # store the key in a PROTECTED GitHub Environment, and uncomment BOTH
+          # the `environment:` binding above AND this line:
           # COUNCIL_API_KEY: ${{ secrets.COUNCIL_API_KEY }}
         run: python .github/scripts/llm-council.py

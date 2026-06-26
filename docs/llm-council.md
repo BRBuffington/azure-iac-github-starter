@@ -84,9 +84,23 @@ The council ships advisory. To let a `BLOCK` actually stop a merge:
 the script to always pass and bypass the very gate it is supposed to enforce.
 This caveat applies to **any** in-repo required check (terraform-validate,
 policy-test, etc.), not just this one. `CODEOWNERS` on `/.github/` closes it: a PR
-that touches the council's own workflow or script cannot merge without a Code
-Owner's review, so the gate can't be silently neutered. Treat blocking mode as
-defense-in-depth *behind* the human gate, never as a standalone control.
+that touches the council's own workflow or script cannot **merge** without a Code
+Owner's review, so a neutered gate is caught in review. Note the boundary
+precisely — `CODEOWNERS` gates the **merge**, not the check's **execution**: the
+modified script still *runs* on the PR, it just can't *merge* without a human
+seeing the change. For the strongest posture (the modified job never even runs
+until a human approves), also bind the council job to a GitHub Environment with
+required reviewers — the same mechanism used for external-provider secrets below.
+Treat blocking mode as defense-in-depth *behind* the human gate, never as a
+standalone control.
+
+**Path-filter caveat:** this workflow is `paths:`-filtered (to `infra/`,
+`policy/`, and `.github/`). A status check that never runs never reports, so if
+you make `llm-council` a **required** check in branch protection, a PR that
+touches *none* of those paths leaves the check perpetually "pending" and blocks
+the merge. To use it as a required gate, **remove the `paths:` filter** in
+`llm-council.yml` so the workflow runs (and reports a result) on every PR — or
+keep it advisory.
 
 Keep `CODEOWNERS` as the human gate regardless — the council is a second
 opinion, not a replacement for review.
@@ -115,8 +129,9 @@ accordingly:
      job **and** the `COUNCIL_API_KEY:` line — an Environment secret only resolves
      in a job that declares `environment:`, so the binding is required, not
      optional.
-  3. Keep `CODEOWNERS` on `/.github/` so changes to the council's own workflow or
-     script are reviewed before they run.
+  3. Keep `CODEOWNERS` on `/.github/` so a change to the council's own workflow
+     or script can't **merge** without a Code Owner's review (CODEOWNERS gates
+     the merge, not the check's execution).
 
   A plain repo/org secret also works *without* the `environment:` binding, but it
   is exposed to PR-controlled code on same-repo PRs — prefer the protected

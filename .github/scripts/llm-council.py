@@ -62,8 +62,8 @@ PROVIDER_DEFAULTS: dict[str, dict] = {
         "endpoint": "https://models.github.ai/inference/chat/completions",
         "models": [
             "openai/gpt-4o",
-            "mistral-ai/Mistral-Large-2411",
-            "meta/Llama-3.3-70B-Instruct",
+            "meta/llama-3.3-70b-instruct",
+            "cohere/cohere-command-a",
         ],
     },
     "openai": {

@@ -41,11 +41,13 @@ workflow already grants the `models: read` permission and passes the built-in
 | Default model | Family |
 |---|---|
 | `openai/gpt-4o` | OpenAI |
-| `mistral-ai/Mistral-Large-2411` | Mistral |
-| `meta/Llama-3.3-70B-Instruct` | Meta |
+| `meta/llama-3.3-70b-instruct` | Meta |
+| `cohere/cohere-command-a` | Cohere |
 
 Your org must have GitHub Models enabled. If it isn't, the council posts a
 "could not run" note and passes — enable it, or switch providers below.
+Model IDs come from the live catalog (`https://models.github.ai/catalog/models`)
+and drift over time; verify the panel against it if a model 404s.
 
 ## Switch providers
 

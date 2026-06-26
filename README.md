@@ -23,7 +23,7 @@ names, and you have a working, opinionated pipeline on day one.
 | `.github/workflows/foundry-iq-sync.yml` | Optional: sync this repo's docs + policies to an Azure Blob container so a Foundry IQ knowledge source can ground an agent on them. Inert until configured. |
 | `.github/workflows/state-migrate.yml` | One-time, attended migration of a flat/laptop state file to the per-config CD key (Terraform-native, no Azure CLI needed). |
 | `.github/workflows/policy-test.yml` | Runs the OPA policy unit tests on every change to `policy/`. |
-| `.github/workflows/workflow-lint.yml` | Lints the repo's own GitHub Actions workflows with **actionlint** on every change to `.github/workflows/**` — catches the "valid YAML, invalid to GitHub's compiler" class (bad context refs, empty `${{ }}`, broken `needs`) in PR review, before it reaches `main`. |
+| `.github/workflows/workflow-lint.yml` | Lints the repo's own GitHub Actions workflows with **actionlint** on every change to `.github/workflows/**` — catches the "valid YAML, invalid to GitHub's compiler" class (bad context refs, empty interpolations, broken `needs`) in PR review, before it reaches `main`. |
 | `.github/CODEOWNERS` | Required-reviewer governance — the human gate on infra and policy changes. |
 | `policy/*.rego` | **State-safety gate** (flat-key + rebuild guards) **and a governance pack** (regions, tags, subscriptions, network, transport). All unit-tested (39 tests). |
 | `policy/governance.params.json` | Client-editable config that turns each governance guardrail on/off and scopes it. |

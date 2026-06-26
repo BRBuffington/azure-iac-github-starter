@@ -17,12 +17,12 @@ sentences of *why*.
 
 ### 2026-06-26 — lint the repo's own workflows in CI (actionlint)
 A workflow file can parse as valid YAML yet still be rejected by GitHub's workflow
-compiler (invalid context access, an empty `${{ }}`, a broken `needs` ref), which
-aborts the run at startup with zero jobs and an opaque message. `workflow-lint.yml`
-runs actionlint on every change to `.github/workflows/**` so that class is caught in
-PR review, not after merge. actionlint is pinned to a release (same supply-chain
-posture as the pinned conftest install) and shellcheck on the hosted runner
-deep-checks the embedded `run:` scripts.
+compiler (invalid context access, an empty interpolation expression, a broken
+`needs` ref), which aborts the run at startup with zero jobs and an opaque message.
+`workflow-lint.yml` runs actionlint on every change to `.github/workflows/**` so
+that class is caught in PR review, not after merge. actionlint is pinned to a
+release (same supply-chain posture as the pinned conftest install) and shellcheck
+on the hosted runner deep-checks the embedded run: scripts.
 
 ## Learned guardrails (anti-patterns — don't repeat)
 

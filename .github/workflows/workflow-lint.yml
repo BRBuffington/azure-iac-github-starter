@@ -42,7 +42,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          # shellcheck ships on GitHub-hosted ubuntu runners, so actionlint also
-          # deep-checks the embedded run: scripts. -color for readable
-          # annotations. With no path args it auto-discovers .github/workflows/.
+          # Note: ShellCheck ships on GitHub-hosted ubuntu runners, so actionlint
+          # also deep-checks the embedded run: scripts. -color for readable
+          # annotations; with no path args it auto-discovers .github/workflows/.
           actionlint -color

@@ -80,6 +80,27 @@ The council ships advisory. To let a `BLOCK` actually stop a merge:
 Keep `CODEOWNERS` as the human gate regardless — the council is a second
 opinion, not a replacement for review.
 
+## Security — secret handling
+
+The workflow runs `.github/scripts/llm-council.py`, which lives in the repo and
+can therefore be **modified by a pull request**. Treat the job's credentials
+accordingly:
+
+- **Fork PRs don't run it.** The job is gated to same-repo PRs
+  (`head.repo.full_name == github.repository`). A fork PR gets a read-only
+  `GITHUB_TOKEN` and no secrets, so it couldn't post a comment anyway — and no
+  untrusted code ever runs with this job's token.
+- **The default carries no standing secret.** GitHub Models uses only the
+  scoped, ephemeral `GITHUB_TOKEN` (`models: read` + `pull-requests: write`),
+  which expires with the run.
+- **External-provider keys are an explicit opt-in.** `COUNCIL_API_KEY` is left
+  commented out in the workflow on purpose — wiring a *standing* provider secret
+  exposes it to the (same-repo) PR-controlled script. If you use OpenAI / Azure
+  OpenAI / Anthropic, store the key in a **GitHub Environment with required
+  reviewers** so its release is gated by a human, and keep `CODEOWNERS` on
+  `.github/` so changes to the council script itself are reviewed before they
+  run.
+
 ## Data-governance note (read this for regulated / PHI environments)
 
 This repo is built for **private, regulated (PHI / HIPAA / HITRUST)**

@@ -262,17 +262,28 @@ def fetch_diff(repo, pr, token, max_bytes):
 
 
 def post_comment(repo, pr, token, body):
-    """Upsert the council comment (find by marker → PATCH, else POST)."""
-    status, text = _http(
-        f"{GITHUB_API}/repos/{repo}/issues/{pr}/comments?per_page=100",
-        headers=_gh_headers(token),
-    )
-    if status < 300:
-        for c in json.loads(text):
+    """Upsert the council comment (find by marker → PATCH, else POST).
+
+    Pages through all PR comments so the marker upsert stays reliable on a busy
+    PR with more than one page of comments (otherwise it would post a duplicate
+    council comment instead of editing the existing one)."""
+    page = 1
+    while True:
+        status, text = _http(
+            f"{GITHUB_API}/repos/{repo}/issues/{pr}/comments?per_page=100&page={page}",
+            headers=_gh_headers(token),
+        )
+        if status >= 300:
+            break
+        items = json.loads(text)
+        for c in items:
             if MARKER in (c.get("body") or ""):
                 _http(f"{GITHUB_API}/repos/{repo}/issues/comments/{c['id']}",
                       "PATCH", _gh_headers(token), {"body": body})
                 return
+        if len(items) < 100:
+            break
+        page += 1
     _http(f"{GITHUB_API}/repos/{repo}/issues/{pr}/comments",
           "POST", _gh_headers(token), {"body": body})
 

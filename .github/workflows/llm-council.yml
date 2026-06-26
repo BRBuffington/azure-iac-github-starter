@@ -32,8 +32,12 @@ concurrency:
 
 jobs:
   council:
-    # Review human PRs only — skip drafts and bot authors (Dependabot, etc.).
-    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' }}
+    # Review human PRs only: skip drafts, bot authors (Dependabot, etc.), and
+    # fork PRs. A fork PR gets a read-only GITHUB_TOKEN (can't post the review
+    # comment) and no secrets, so the council can't function there — restricting
+    # to same-repo PRs also keeps the trust boundary explicit (no untrusted code
+    # ever runs with this job's token).
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' && github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
     steps:
       - uses: actions/checkout@v4
@@ -52,14 +56,20 @@ jobs:
           PR_TITLE: ${{ github.event.pull_request.title }}
           PR_AUTHOR: ${{ github.event.pull_request.user.login }}
           # ── Council config — all optional; sensible defaults in the script ──
-          # Provider/models/posture are repo VARIABLES (Settings > Variables);
-          # the API key for non-GitHub-Models providers is a SECRET. Unset =
-          # GitHub Models with a default 3-model panel, advisory.
+          # Provider/models/posture are repo VARIABLES (Settings > Variables).
+          # Unset = GitHub Models with a default 3-model panel, advisory.
           COUNCIL_PROVIDER: ${{ vars.COUNCIL_PROVIDER }}
           COUNCIL_MODELS: ${{ vars.COUNCIL_MODELS }}
           COUNCIL_ENDPOINT: ${{ vars.COUNCIL_ENDPOINT }}
           COUNCIL_API_VERSION: ${{ vars.COUNCIL_API_VERSION }}
           COUNCIL_BLOCKING: ${{ vars.COUNCIL_BLOCKING }}
           COUNCIL_MAX_DIFF_BYTES: ${{ vars.COUNCIL_MAX_DIFF_BYTES }}
-          COUNCIL_API_KEY: ${{ secrets.COUNCIL_API_KEY }}
+          # An external-provider API key is intentionally NOT wired here by
+          # default. This step runs repo code that a pull request can modify, so
+          # a standing provider secret would be exposed to PR-controlled code.
+          # The default provider (GitHub Models) uses only the scoped, ephemeral
+          # GITHUB_TOKEN above — no standing secret. To use OpenAI / Azure OpenAI
+          # / Anthropic, read "Security — secret handling" in docs/llm-council.md,
+          # store the key in a PROTECTED GitHub Environment, and uncomment:
+          # COUNCIL_API_KEY: ${{ secrets.COUNCIL_API_KEY }}
         run: python .github/scripts/llm-council.py

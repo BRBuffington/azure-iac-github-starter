@@ -15,6 +15,17 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-06-26 — advisory, multi-model "LLM council" PR review (provider-pluggable)
+Added an optional council (`.github/workflows/llm-council.yml` + `.github/scripts/llm-council.py`):
+2-3 *distinct* models independently review each PR diff and one consolidated verdict comment is
+posted. Chose **advisory** (never blocks unless an adopter opts in via `COUNCIL_BLOCKING` + a
+required check) so the human + `CODEOWNERS` stay the gate, and **multi-model** so no single
+model's blind spot decides. Ships defaulting to GitHub Models (zero setup) but is
+provider-pluggable to Azure OpenAI / OpenAI / Anthropic. Because the diff leaves the repo, the
+data-governance note in `docs/llm-council.md` steers regulated/PHI repos to keep inference
+in-tenant (Azure OpenAI) and validate the provider's data terms first. Self-contained,
+stdlib-only, and fail-soft so an unconfigured backend never breaks a PR.
+
 ### 2026-06-26 — lint the repo's own workflows in CI (actionlint)
 A workflow file can parse as valid YAML yet still be rejected by GitHub's workflow
 compiler (invalid context access, an empty interpolation expression, a broken

@@ -1,0 +1,82 @@
+# Multi-LLM "council" PR review — an ADVISORY, AI-assisted second opinion.
+#
+# On every PR it sends the diff to 2-3 DISTINCT models, collects independent
+# verdicts (APPROVE / COMMENT / BLOCK with cited reasons), and posts ONE
+# consolidated review comment. It is NOT a merge gate by default — the human +
+# CODEOWNERS stay the gate. To make it gate: set the `COUNCIL_BLOCKING` repo
+# variable to "true" AND mark this check required in branch protection.
+#
+# Ships defaulting to GitHub Models (zero external setup — the Actions
+# GITHUB_TOKEN + the `models: read` permission). Swap providers with the
+# COUNCIL_* repo variables / the COUNCIL_API_KEY secret. The script is
+# fail-soft: if no backend is configured it posts a short note and passes, so it
+# never breaks a PR. See docs/llm-council.md.
+name: llm-council
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - "infra/**"
+      - "policy/**"
+      - ".github/**"
+
+permissions:
+  contents: read
+  pull-requests: write   # post the consolidated review comment
+  models: read           # GitHub Models inference (the default provider)
+
+concurrency:
+  group: llm-council-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  council:
+    # Review human PRs only: skip drafts, bot authors (Dependabot, etc.), and
+    # fork PRs. A fork PR gets a read-only GITHUB_TOKEN (can't post the review
+    # comment) and no secrets, so the council can't function there — restricting
+    # to same-repo PRs also keeps the trust boundary explicit (no untrusted code
+    # ever runs with this job's token).
+    if: ${{ !github.event.pull_request.draft && github.event.pull_request.user.type != 'Bot' && github.event.pull_request.head.repo.full_name == github.repository }}
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    # For an EXTERNAL provider whose key lives in a PROTECTED GitHub Environment
+    # (recommended over a plain repo secret — see docs/llm-council.md), uncomment
+    # this binding AND the COUNCIL_API_KEY line below, then create an Environment
+    # of this name with the secret + required reviewers. An Environment secret
+    # only resolves in a job that declares `environment:`.
+    # environment: llm-council
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: LLM Council review
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_AUTHOR: ${{ github.event.pull_request.user.login }}
+          # ── Council config — all optional; sensible defaults in the script ──
+          # Provider/models/posture are repo VARIABLES (Settings > Variables).
+          # Unset = GitHub Models with a default 3-model panel, advisory.
+          COUNCIL_PROVIDER: ${{ vars.COUNCIL_PROVIDER }}
+          COUNCIL_MODELS: ${{ vars.COUNCIL_MODELS }}
+          COUNCIL_ENDPOINT: ${{ vars.COUNCIL_ENDPOINT }}
+          COUNCIL_API_VERSION: ${{ vars.COUNCIL_API_VERSION }}
+          COUNCIL_BLOCKING: ${{ vars.COUNCIL_BLOCKING }}
+          COUNCIL_MAX_DIFF_BYTES: ${{ vars.COUNCIL_MAX_DIFF_BYTES }}
+          # An external-provider API key is intentionally NOT wired here by
+          # default. This step runs repo code that a pull request can modify, so
+          # a standing provider secret would be exposed to PR-controlled code.
+          # The default provider (GitHub Models) uses only the scoped, ephemeral
+          # GITHUB_TOKEN above — no standing secret. To use OpenAI / Azure OpenAI
+          # / Anthropic, read "Security — secret handling" in docs/llm-council.md,
+          # store the key in a PROTECTED GitHub Environment, and uncomment BOTH
+          # the `environment:` binding above AND this line:
+          # COUNCIL_API_KEY: ${{ secrets.COUNCIL_API_KEY }}
+        run: python .github/scripts/llm-council.py

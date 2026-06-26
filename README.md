@@ -24,6 +24,7 @@ names, and you have a working, opinionated pipeline on day one.
 | `.github/workflows/state-migrate.yml` | One-time, attended migration of a flat/laptop state file to the per-config CD key (Terraform-native, no Azure CLI needed). |
 | `.github/workflows/policy-test.yml` | Runs the OPA policy unit tests on every change to `policy/`. |
 | `.github/workflows/workflow-lint.yml` | Lints the repo's own GitHub Actions workflows with **actionlint** on every change to `.github/workflows/**` — catches the "valid YAML, invalid to GitHub's compiler" class (bad context refs, empty interpolations, broken `needs`) in PR review, before it reaches `main`. |
+| `.github/workflows/llm-council.yml` | Optional **advisory multi-model PR review** — 2-3 distinct LLMs independently review each PR diff and post one consolidated verdict comment (`.github/scripts/llm-council.py`). Defaults to GitHub Models (zero setup), provider-pluggable. Not a merge gate unless you opt in. See `docs/llm-council.md`. |
 | `.github/CODEOWNERS` | Required-reviewer governance — the human gate on infra and policy changes. |
 | `policy/*.rego` | **State-safety gate** (flat-key + rebuild guards) **and a governance pack** (regions, tags, subscriptions, network, transport). All unit-tested (39 tests). |
 | `policy/governance.params.json` | Client-editable config that turns each governance guardrail on/off and scopes it. |
@@ -36,6 +37,7 @@ names, and you have a working, opinionated pipeline on day one.
 | `docs/architecture-decisions.md` | The cited decision record (runners, state, local plans, identity, agent platform). |
 | `docs/policy-guardrails.md` | What each OPA policy checks, how to configure it, and how to add your own. |
 | `docs/foundry-iq.md` | How to ground an AI agent on this repo via a Foundry IQ knowledge base (repo → blob → knowledge source → agent). |
+| `docs/llm-council.md` | The advisory multi-model PR-review council: how it works, provider config (GitHub Models / Azure OpenAI / OpenAI / Anthropic), advisory→required-gate promotion, and the data-governance note for regulated repos. |
 | `docs/state-migration-runbook.md` | Step-by-step for the flat → per-config state migration. |
 
 ## The decisions this repo encodes (one-liners — full rationale + citations in `docs/`)
@@ -63,6 +65,12 @@ names, and you have a working, opinionated pipeline on day one.
    human weeks later — can answer "what deployed this, and when?" off the resource
    itself, with no state access. `LastApplied` is stamped by CI and excluded from the
    plan via `ignore_changes`, so it never churns a diff.
+8. **AI review is advisory, multi-model, and a second opinion — never the gate.** An
+   optional "LLM council" has 2-3 *distinct* models independently review each PR and post
+   one consolidated verdict, alongside `CODEOWNERS` (the human gate). It defaults to
+   off-critical-path advisory and only becomes a required check if you opt in. Multi-model
+   avoids single-model blind spots; advisory avoids handing merge authority to a model.
+   See `docs/llm-council.md`.
 
 ## Quick start
 

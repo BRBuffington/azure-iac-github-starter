@@ -34,8 +34,9 @@ jobs:
           # Pin the version and download the official release binary — same
           # supply-chain posture as the pinned conftest install in
           # terraform-cd.yml. Do NOT pipe an unpinned remote installer into a
-          # shell.
-          VER=1.7.7
+          # shell. 1.7.12+ recognizes the `models:` permission scope used by
+          # llm-council.yml (1.7.7 reports it as an unknown permission scope).
+          VER=1.7.12
           curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${VER}/actionlint_${VER}_linux_amd64.tar.gz" | tar -xz -C /tmp actionlint
           sudo mv /tmp/actionlint /usr/local/bin/actionlint
 

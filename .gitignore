@@ -19,3 +19,7 @@ infra/backend.hcl
 # Local env
 *.tfvars.local
 .env
+
+# Python (the .github/scripts helpers)
+__pycache__/
+*.pyc

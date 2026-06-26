@@ -15,19 +15,32 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
-### YYYY-MM-DD — (example) chose Function App over Container App for the shared MCP host
-The agent's first instinct was a Container App, but a Function App is cheaper and
-sufficient for a lightweight, mostly-static server. Recorded so the next session
-doesn't re-open the same choice. *(Delete this seed entry once you have real ones.)*
+### 2026-06-26 — lint the repo's own workflows in CI (actionlint)
+A workflow file can parse as valid YAML yet still be rejected by GitHub's workflow
+compiler (invalid context access, an empty `${{ }}`, a broken `needs` ref), which
+aborts the run at startup with zero jobs and an opaque message. `workflow-lint.yml`
+runs actionlint on every change to `.github/workflows/**` so that class is caught in
+PR review, not after merge. actionlint is pinned to a release (same supply-chain
+posture as the pinned conftest install) and shellcheck on the hosted runner
+deep-checks the embedded `run:` scripts.
 
 ## Learned guardrails (anti-patterns — don't repeat)
 
 Things that bit us once. Each: the symptom, then the rule that prevents it.
 
-### (example) The agent re-created infrastructure it had already deployed
+### A CD apply gate flipped by a null-coalesced plan-only input
+**Symptom:** an apply gate written as `plan_only: ${{ inputs.plan_only != false }}`
+silently turns push-to-main into an APPLY — on a push the input is null and GitHub
+coerces `null != false` to true; the mirror shape `${{ inputs.plan_only == null &&
+true || inputs.plan_only }}` silently turns a dispatch-to-apply into a no-op.
+**Rule:** gate apply on the EVENT plus an explicit boolean
+(`github.event_name == 'workflow_dispatch' && inputs.apply && ...`), never on a
+null-coalesced `plan_only` expression (see the `apply` job in `terraform-cd.yml`),
+and lint workflows in CI (`workflow-lint.yml`) so expression footguns surface in review.
+
+### The agent re-created infrastructure it had already deployed
 **Symptom:** the agent couldn't find a resource it built weeks earlier and
 proposed re-creating it — it took three reminders. **Rule:** every resource
 carries a `DeployedByRepo` tag + a post-apply `LastApplied` stamp (see
 `infra/locals.tf` and the CD stamp step) so prior work is traceable off the
-resource itself, and the agent reads this file before deciding. *(Delete once you
-have real ones.)*
+resource itself, and the agent reads this file before deciding.

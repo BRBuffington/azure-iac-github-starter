@@ -1,0 +1,48 @@
+# Lint the repository's OWN GitHub Actions workflows on every change to them.
+#
+# A workflow file can parse as valid YAML yet still be REJECTED by GitHub's
+# workflow compiler — invalid context access (e.g. `job.workflow_ref`), an empty
+# `${{ }}` expression, a bad `needs` reference. Those failures abort the run at
+# startup with ZERO jobs and an opaque "this run likely failed because of a
+# workflow file issue" message, and a plain YAML parser cannot catch them.
+# actionlint is a GitHub-aware linter (plus shellcheck on embedded `run:`
+# scripts) that surfaces that class in PR review, before it ever reaches main.
+name: workflow-lint
+
+on:
+  pull_request:
+    paths:
+      - ".github/workflows/**"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  actionlint:
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Setup actionlint (pinned release)
+        shell: bash
+        run: |
+          set -euo pipefail
+          # Pin the version and download the official release binary — same
+          # supply-chain posture as the pinned conftest install in
+          # terraform-cd.yml. Do NOT pipe an unpinned remote installer into a
+          # shell.
+          VER=1.7.7
+          curl -sSL "https://github.com/rhysd/actionlint/releases/download/v${VER}/actionlint_${VER}_linux_amd64.tar.gz" | tar -xz -C /tmp actionlint
+          sudo mv /tmp/actionlint /usr/local/bin/actionlint
+
+      - name: actionlint
+        shell: bash
+        run: |
+          set -euo pipefail
+          # shellcheck ships on GitHub-hosted ubuntu runners, so actionlint also
+          # deep-checks the embedded run: scripts. -color for readable
+          # annotations. With no path args it auto-discovers .github/workflows/.
+          actionlint -color

@@ -149,6 +149,13 @@ jobs:
   apply:
     needs: plan
     # Apply ONLY on an explicit dispatch with apply=true AND a non-empty plan.
+    # Gate on the EVENT (workflow_dispatch) plus an explicit boolean input —
+    # never on a null-coalesced `plan_only` expression. On a push event the input
+    # is null, and GitHub coerces `null != false` to true in a loose comparison,
+    # so `plan_only: ${{ inputs.plan_only != false }}` silently turns push-to-main
+    # into an APPLY; the mirror shape `${{ inputs.plan_only == null && true ||
+    # inputs.plan_only }}` silently turns a dispatch-to-apply into a no-op. The
+    # event check below avoids both: push => plan only, dispatch+apply => apply.
     if: ${{ github.event_name == 'workflow_dispatch' && inputs.apply && needs.plan.outputs.has_changes == 'true' }}
     runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
     environment: ${{ vars.PLAN_ENVIRONMENT || 'dev' }}-apply   # required reviewers live here

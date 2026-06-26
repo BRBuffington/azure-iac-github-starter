@@ -224,10 +224,14 @@ jobs:
           # Scope by DeployedByRepo (az --tag) AND DeployedConfig (JMESPath).
           # Two discovery calls: `az resource list` returns resources but NOT
           # resource groups, so RGs are listed separately via `az group list`.
-          mapfile -t IDS < <(
-            az resource list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv || true
-            az group list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv || true
-          )
+          # Capture each discovery into a variable with an EXPLICIT exit-code
+          # check: a discovery ERROR (auth, throttle, API failure) FAILS the
+          # step, while an empty result stays a clean no-op. A previous `|| true`
+          # swallowed real discovery failures, letting the run go green having
+          # stamped nothing (az list exits 0 on no-match, non-zero only on error).
+          RES_IDS=$(az resource list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv) || { echo "::error::resource discovery failed (az resource list)"; exit 1; }
+          GRP_IDS=$(az group list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv) || { echo "::error::resource-group discovery failed (az group list)"; exit 1; }
+          mapfile -t IDS < <(printf '%s\n%s\n' "$RES_IDS" "$GRP_IDS" | grep -v '^$' || true)
           echo "Stamping LastApplied=$DATE on ${#IDS[@]} resources/groups (DeployedByRepo=${DEPLOYED_BY_REPO}, DeployedConfig=${CONFIG})"
           STAMPED=0
           FAILED=0

@@ -48,6 +48,7 @@ jobs:
         working-directory: infra
     env:
       CONFIG: ${{ inputs.config || 'example-eus-dev' }}
+      DEPLOYED_BY_REPO: ${{ github.repository }}            # provenance: written into common_tags
       ARM_USE_OIDC: "true"
       ARM_CLIENT_ID: ${{ vars.AZURE_PLAN_CLIENT_ID }}      # least-priv: Reader + state read
       ARM_TENANT_ID: ${{ vars.AZURE_TENANT_ID }}
@@ -100,7 +101,7 @@ jobs:
         id: plan
         run: |
           set -euo pipefail
-          terraform plan -input=false -out="${CONFIG}.tfplan" -var-file="configs/${CONFIG}.tfvars" -detailed-exitcode || ec=$?
+          terraform plan -input=false -out="${CONFIG}.tfplan" -var-file="configs/${CONFIG}.tfvars" -var="deployed_by_repo=${DEPLOYED_BY_REPO}" -var="deployed_config=${CONFIG}" -detailed-exitcode || ec=$?
           ec=${ec:-0}
           case "$ec" in
             0) echo "has_changes=false" >> "$GITHUB_OUTPUT" ;;
@@ -188,3 +189,71 @@ jobs:
 
       - name: terraform apply (the reviewed plan)
         run: terraform apply -input=false "${CONFIG}.tfplan"
+
+      # Stamp LastApplied=<UTC date> on THIS config's resources, in the same
+      # already-approved apply job (no second environment gate). Kept OUT of
+      # Terraform so it reflects only on apply, never on plan (resources carry
+      # ignore_changes = [tags["LastApplied"]]). Resources are found by BOTH the
+      # TF-managed DeployedByRepo (= github.repository) and DeployedConfig
+      # (= this config) tags, so applying one config never re-stamps another
+      # config the same repo owns. No state access is needed; no-op until your
+      # resources carry the tags. The apply identity needs tag-write (e.g. Tag
+      # Contributor) on the stamped resources.
+      - name: Azure login (OIDC, apply identity) for the tag stamp
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_APPLY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Stamp LastApplied on this config's resources
+        env:
+          # Value via env (not an inline expression in the run body) so nothing
+          # is interpolated into the shell. github.repository = DeployedByRepo;
+          # CONFIG (job env) = DeployedConfig.
+          DEPLOYED_BY_REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          # Azure CLI ships on GitHub-hosted ubuntu runners. Fail closed on a
+          # self-hosted runner that lacks it rather than piping an unpinned
+          # remote installer into sudo (supply-chain posture for regulated envs).
+          if ! command -v az >/dev/null 2>&1; then
+            echo "::error::Azure CLI not found. GitHub-hosted ubuntu runners include it; on a self-hosted runner install it first (https://learn.microsoft.com/cli/azure/install-azure-cli)."
+            exit 1
+          fi
+          DATE=$(date -u +%F)
+          # Scope by DeployedByRepo (az --tag) AND DeployedConfig (JMESPath).
+          # Two discovery calls: `az resource list` returns resources but NOT
+          # resource groups, so RGs are listed separately via `az group list`.
+          # Capture each discovery into a variable with an EXPLICIT exit-code
+          # check: a discovery ERROR (auth, throttle, API failure) FAILS the
+          # step, while an empty result stays a clean no-op. A previous `|| true`
+          # swallowed real discovery failures, letting the run go green having
+          # stamped nothing (az list exits 0 on no-match, non-zero only on error).
+          RES_IDS=$(az resource list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv) || { echo "::error::resource discovery failed (az resource list)"; exit 1; }
+          GRP_IDS=$(az group list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv) || { echo "::error::resource-group discovery failed (az group list)"; exit 1; }
+          mapfile -t IDS < <(printf '%s\n%s\n' "$RES_IDS" "$GRP_IDS" | grep -v '^$' || true)
+          echo "Stamping LastApplied=$DATE on ${#IDS[@]} resources/groups (DeployedByRepo=${DEPLOYED_BY_REPO}, DeployedConfig=${CONFIG})"
+          STAMPED=0
+          FAILED=0
+          for id in "${IDS[@]}"; do
+            [ -z "$id" ] && continue
+            # Per-resource guard: an untaggable resource type (or a transient
+            # error) must not abort the whole stamp under `set -e`. Failures are
+            # surfaced as warning annotations, never silently swallowed.
+            if az tag update --resource-id "$id" --operation Merge --tags "LastApplied=$DATE" --only-show-errors >/dev/null 2>&1; then
+              echo "  stamped $id"
+              STAMPED=$((STAMPED + 1))
+            else
+              echo "::warning::LastApplied stamp failed for $id (untaggable type, resource lock, or the apply identity lacks Tag Contributor)."
+              FAILED=$((FAILED + 1))
+            fi
+          done
+          echo "LastApplied stamp summary: ${STAMPED} stamped, ${FAILED} failed (config=${CONFIG})."
+          # Individual failures are tolerated (the infra apply already
+          # succeeded), but if there were targets and EVERY stamp failed that is
+          # a systemic problem (usually a missing Tag Contributor role) and must
+          # fail the step rather than go green having written zero provenance.
+          if [ "${FAILED}" -gt 0 ] && [ "${STAMPED}" -eq 0 ]; then
+            echo "::error::All ${FAILED} LastApplied stamp(s) failed - the apply identity likely lacks the Tag Contributor role on the target scope."
+            exit 1
+          fi

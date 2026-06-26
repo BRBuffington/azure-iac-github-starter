@@ -55,20 +55,22 @@ jobs:
           quiet: true
           soft_fail: false   # fail the PR on a policy violation; tune to your baseline
 
-      - name: terraform init
-        run: |
-          terraform init -input=false \
-            -backend-config="resource_group_name=${{ vars.TF_BACKEND_RESOURCE_GROUP }}" \
-            -backend-config="storage_account_name=${{ vars.TF_BACKEND_STORAGE_ACCOUNT }}" \
-            -backend-config="container_name=${{ vars.TF_BACKEND_CONTAINER }}" \
-            -backend-config="key=${{ vars.TF_BACKEND_KEY_PREFIX }}/${{ matrix.config }}.tfstate" \
-            -backend-config="use_azuread_auth=true" \
-            -backend-config="use_oidc=true"
+      - name: terraform init (no backend — validate only)
+        # A template repo has no remote state to reach. Init without the backend
+        # so fmt + validate run on any clone with zero Azure setup. The optional
+        # speculative-plan step below re-inits WITH the backend, and only when
+        # one is configured.
+        run: terraform init -input=false -backend=false
 
       - name: terraform validate
         run: terraform validate
 
+      # The speculative plan + shift-left governance gate needs the real backend
+      # and Azure creds. A template repo has neither, so this whole block is
+      # skipped there (fmt + validate + checkov above are the template's gate);
+      # it runs for adopters who have configured a backend.
       - name: Setup conftest (OPA)
+        if: ${{ vars.TF_BACKEND_STORAGE_ACCOUNT != '' }}
         shell: bash
         run: |
           set -euo pipefail
@@ -77,9 +79,17 @@ jobs:
           sudo mv /tmp/conftest /usr/local/bin/conftest
 
       - name: terraform plan (speculative) + governance gate
+        if: ${{ vars.TF_BACKEND_STORAGE_ACCOUNT != '' }}
         run: |
           set -euo pipefail
-          terraform plan -input=false -lock=false -out=pr.tfplan -var-file="configs/${{ matrix.config }}.tfvars"
+          terraform init -input=false -reconfigure \
+            -backend-config="resource_group_name=${{ vars.TF_BACKEND_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ vars.TF_BACKEND_STORAGE_ACCOUNT }}" \
+            -backend-config="container_name=${{ vars.TF_BACKEND_CONTAINER }}" \
+            -backend-config="key=${{ vars.TF_BACKEND_KEY_PREFIX }}/${{ matrix.config }}.tfstate" \
+            -backend-config="use_azuread_auth=true" \
+            -backend-config="use_oidc=true"
+          terraform plan -input=false -lock=false -out=pr.tfplan -var-file="configs/${{ matrix.config }}.tfvars" -var="deployed_by_repo=${{ github.repository }}" -var="deployed_config=${{ matrix.config }}"
           terraform show -json pr.tfplan > pr.tfplan.json
           # Shift-left: run the governance guardrails on the PR plan so violations
           # surface in review, not at apply. State-safety (package main) is

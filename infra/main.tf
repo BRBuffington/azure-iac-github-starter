@@ -4,7 +4,14 @@
 resource "azurerm_resource_group" "this" {
   name     = "rg-${var.scope}-${var.region_alias}-${var.environment}"
   location = var.location
-  tags     = var.tags
+  tags     = local.common_tags
+
+  lifecycle {
+    # LastApplied is stamped post-apply by CI (the stamp-last-applied job), not
+    # by Terraform — ignore it so the stamp never shows as plan drift. Apply the
+    # same block to every taggable resource you add.
+    ignore_changes = [tags["LastApplied"]]
+  }
 }
 
 # Example placeholder resource. Swap for your real landing-zone modules.
@@ -14,5 +21,8 @@ resource "azurerm_resource_group" "this" {
 #   location            = azurerm_resource_group.this.location
 #   sku                 = "PerGB2018"
 #   retention_in_days   = 30
-#   tags                = var.tags
+#   tags                = local.common_tags
+#   lifecycle {
+#     ignore_changes = [tags["LastApplied"]]
+#   }
 # }

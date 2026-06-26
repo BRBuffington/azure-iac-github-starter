@@ -5,6 +5,7 @@
   "allowed_regions": [],
 
   "//required_tags": "CAF tagging governance, enforced on the types in tag_enforced_types. Empty = off. Example: [\"environment\", \"owner\", \"data_classification\"]",
+  "//provenance_tags": "DeployedByRepo is set automatically (infra/locals.tf, from github.repository) so an agent or human can trace any resource back to its owning repo. Add \"DeployedByRepo\" to required_tags to ENFORCE it. LastApplied is stamped post-apply by CI and is intentionally NOT a required tag (it does not exist at plan time).",
   "required_tags": [],
   "tag_enforced_types": ["azurerm_resource_group"],
   "//tag_allowed_values": "Optional per-tag allowed-value validation. Example: {\"environment\": [\"dev\", \"tst\", \"prd\"]}",

@@ -318,7 +318,10 @@ def main(argv=None):
     token = os.environ.get("GITHUB_TOKEN", "")
     provider = (os.environ.get("COUNCIL_PROVIDER") or "github-models").strip()
     blocking = (os.environ.get("COUNCIL_BLOCKING") or "false").strip().lower() == "true"
-    max_bytes = int((os.environ.get("COUNCIL_MAX_DIFF_BYTES") or "60000").strip())
+    # Defensive parse: an operator typo on this optional var must not crash an
+    # advisory check (fail-soft). Anything non-numeric falls back to the default.
+    _raw_max = (os.environ.get("COUNCIL_MAX_DIFF_BYTES") or "60000").strip()
+    max_bytes = int(_raw_max) if _raw_max.isdigit() else 60000
 
     if not (repo and pr and token):
         print("missing GITHUB_REPOSITORY / PR_NUMBER / GITHUB_TOKEN", file=sys.stderr)
@@ -387,4 +390,13 @@ def main(argv=None):
 
 
 if __name__ == "__main__":
-    raise SystemExit(main())
+    # Advisory contract: never red a PR on an internal error. main() returns 1
+    # only intentionally (blocking mode + a BLOCK verdict); any unexpected
+    # exception is logged and downgraded to a clean exit 0.
+    try:
+        _code = main()
+    except Exception as _e:  # noqa: BLE001
+        print(f"llm-council: unexpected error, exiting 0 (advisory): {_e}",
+              file=sys.stderr)
+        _code = 0
+    raise SystemExit(_code)

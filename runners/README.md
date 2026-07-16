@@ -33,6 +33,12 @@ Why ephemeral container jobs:
    `["self-hosted","alz-runner","linux","x64"]`. The workflows read it; absent, they
    fall back to `ubuntu-latest` (only valid while state is still publicly reachable).
 
+Container Apps jobs do **not** support running Docker commands inside the runner
+container. Preinstall required tools in the hardened image or use pinned native
+installers in the workflow. Do not use Docker-based actions for Checkov, conftest,
+or other required gates; `terraform-validate.yml` installs pinned Checkov as a
+Python CLI for this reason.
+
 ## Alternatives
 
 - **VM scale set runners** — simpler if you already operate VMSS; less elastic, you own
@@ -44,5 +50,7 @@ Why ephemeral container jobs:
 
 - Ephemeral / clean-job isolation, hardened + patched image, outbound-only egress, no
   inbound management ports, least-privilege runner group, centralized logs.
+- No Docker-in-Docker assumptions or Docker-based actions; validate the complete
+  workflow against the actual runner image before private-state cutover.
 - The runner identity is the pipeline's OIDC identity — keep plan read-only and apply
   scoped-write (see docs/architecture-decisions.md, Identity).

@@ -33,8 +33,14 @@ names, and you have a working, opinionated pipeline on day one.
 | `runners/README.md` | The **self-hosted, in-VNet, ephemeral runner** pattern (the only way to reach private-endpoint state). |
 | `.vscode/mcp.json.example` | Agent config: the Terraform + Azure MCP servers for the VS Code + GitHub Copilot authoring loop. |
 | `.github/copilot-instructions.md` | Repo-scoped Copilot guidance so the agent writes Terraform that matches these conventions. |
+| `.github/instructions/terraform.instructions.md` | Path-scoped Terraform rules for modules, state, identity, security, and required evidence. |
+| `.github/skills/terraform-review/SKILL.md` | Agent-neutral, evidence-first Terraform review procedure that cannot authorize apply. |
+| `AGENTS.md` | Shared operating contract for Copilot, Claude Code, Codex, Gemini CLI, and other agents. |
+| `examples/read-only-guardrails-mcp/` | Runnable eight-tool MCP reference whose exact read-only contract and immutable artifact are tested in CI. |
+| `.github/workflows/read-only-mcp-test.yml` | Contract gate for the read-only MCP allowlist, artifact immutability, and pinned real-SDK load. |
 | `DECISIONS.md` | A living, append-only decisions + learned-guardrails log the agent reads **before** choosing, so a decision is made once — not re-litigated each session. |
 | `docs/architecture-decisions.md` | The cited decision record (runners, state, local plans, identity, agent platform). |
+| `docs/implementation-playbook.md` | Engineering adoption sequence with commands, file links, exit evidence, rollback, and preview/entitlement gates. |
 | `docs/policy-guardrails.md` | What each OPA policy checks, how to configure it, and how to add your own. |
 | `docs/foundry-iq.md` | How to ground an AI agent on this repo via a Foundry IQ knowledge base (repo → blob → knowledge source → agent). |
 | `docs/llm-council.md` | The advisory multi-model PR-review council: how it works, provider config (GitHub Models / Azure OpenAI / OpenAI / Anthropic), advisory→required-gate promotion, and the data-governance note for regulated repos. |
@@ -86,6 +92,8 @@ cp infra/configs/example-eus-dev.tfvars infra/configs/<scope>-<region>-<env>.tfv
 
 See `docs/architecture-decisions.md` for the why, and `runners/README.md` for the
 self-hosted runner setup that makes private-endpoint state reachable.
+Use `docs/implementation-playbook.md` for the phase-by-phase build and validation
+sequence, including the tested read-only MCP and agent-review examples.
 
 ## Provenance
 

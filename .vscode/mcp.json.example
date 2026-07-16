@@ -12,6 +12,11 @@
       "type": "stdio",
       "command": "docker",
       "args": ["run", "-i", "--rm", "hashicorp/terraform-mcp-server"]
+    },
+    "terraform-guardrails-local": {
+      "//": "Optional local sanitized sample. Start examples/read-only-guardrails-mcp/server.py first; replace this URL with the approved authenticated bridge for a pilot.",
+      "type": "http",
+      "url": "http://127.0.0.1:8000/mcp"
     }
   }
 }

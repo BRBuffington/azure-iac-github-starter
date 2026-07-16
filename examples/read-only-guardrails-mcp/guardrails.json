@@ -1,0 +1,74 @@
+{
+  "release": "v0.1.0",
+  "source_commit": "replace-with-reviewed-release-commit",
+  "schema_version": "1.0",
+  "classification": "sanitized-reference",
+  "release_summary": "Initial sanitized guardrail contract for Terraform review.",
+  "naming_rules": {
+    "resource_group": [
+      {
+        "id": "NAM-001",
+        "pattern": "rg-[a-z0-9]+-[a-z0-9]+-(dev|tst|prd)",
+        "message": "Use rg-<workload>-<region>-(dev|tst|prd)."
+      }
+    ],
+    "storage_account": [
+      {
+        "id": "NAM-002",
+        "pattern": "st[a-z0-9]{3,20}(dev|tst|prd)",
+        "message": "Use st<workload><region>(dev|tst|prd) with no hyphens."
+      }
+    ]
+  },
+  "controls": [
+    {
+      "id": "CTL-STATE-001",
+      "title": "Use protected remote state",
+      "applies_to": ["terraform_state"],
+      "requirement": "Use Azure Storage remote state with Entra authorization, a nested key, and network restrictions.",
+      "references": [
+        "https://learn.microsoft.com/azure/developer/terraform/store-state-in-azure-storage"
+      ]
+    },
+    {
+      "id": "CTL-ID-001",
+      "title": "Use workload identity federation",
+      "applies_to": ["github_actions", "terraform_pipeline"],
+      "requirement": "Use OIDC federation and separate plan and apply identities.",
+      "references": [
+        "https://learn.microsoft.com/azure/developer/github/connect-from-azure-openid-connect"
+      ]
+    },
+    {
+      "id": "CTL-AI-001",
+      "title": "Keep AI review advisory",
+      "applies_to": ["*"],
+      "requirement": "Deterministic checks and human approval remain authoritative for merge and apply.",
+      "references": [
+        "https://docs.github.com/en/copilot/concepts/agents/code-review"
+      ]
+    }
+  ],
+  "adrs": [
+    {
+      "id": "ADR-001",
+      "title": "Git is the canonical guardrail source",
+      "status": "accepted",
+      "decision": "Publish reviewed, tagged guardrail artifacts from Git. The MCP runtime serves a pinned release and is never edited directly."
+    }
+  ],
+  "review_checklists": {
+    "terraform": [
+      "Confirm formatting, validation, security scanning, and policy tests pass.",
+      "Confirm the backend key is nested and no Terraform workspace is selected.",
+      "Confirm the plan identity is read-only and apply requires human approval.",
+      "Confirm the plan contains no unexpected destroy or replacement.",
+      "Confirm no secrets or sensitive state values appear in comments or artifacts."
+    ],
+    "networking": [
+      "Confirm public network access follows the approved exception process.",
+      "Confirm private DNS and endpoint reachability are tested from the runner subnet.",
+      "Confirm route and firewall changes preserve symmetric traffic flow."
+    ]
+  }
+}

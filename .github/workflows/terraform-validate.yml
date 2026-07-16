@@ -44,16 +44,22 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
       - name: terraform fmt -check
         run: terraform fmt -check -recursive
 
-      - name: IaC security scan (checkov)
-        uses: bridgecrewio/checkov-action@v12
-        with:
-          directory: infra
-          framework: terraform
-          quiet: true
-          soft_fail: false   # fail the PR on a policy violation; tune to your baseline
+      # Container Apps job runners do not support Docker-in-Docker, so a Docker
+      # action such as bridgecrewio/checkov-action cannot run on the recommended
+      # private runner. Install the same pinned scanner as a normal Python CLI.
+      - name: Install Checkov (pinned)
+        run: python -m pip install --disable-pip-version-check checkov==3.3.8
+
+      - name: IaC security scan (Checkov)
+        run: checkov --directory . --framework terraform --quiet
 
       - name: terraform init (no backend — validate only)
         # A template repo has no remote state to reach. Init without the backend

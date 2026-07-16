@@ -15,6 +15,13 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-07-16 — AI guidance is portable; central guardrails are structurally read-only
+Added an agent-neutral `AGENTS.md`, Terraform path instructions, and a review skill so
+standing rules survive client or model changes. The optional MCP reference exposes one
+exact eight-tool lookup/validation allowlist backed by an immutable, provenance-stamped
+artifact; contract tests fail if a generic or mutation tool appears. AI remains advisory,
+and deterministic checks plus people retain merge and apply authority.
+
 ### 2026-06-26 — advisory, multi-model "LLM council" PR review (provider-pluggable)
 Added an optional council (`.github/workflows/llm-council.yml` + `.github/scripts/llm-council.py`):
 2-3 *distinct* models independently review each PR diff and one consolidated verdict comment is
@@ -38,6 +45,13 @@ on the hosted runner deep-checks the embedded run: scripts.
 ## Learned guardrails (anti-patterns — don't repeat)
 
 Things that bit us once. Each: the symptom, then the rule that prevents it.
+
+### A Docker action cannot run on a Container Apps job runner
+**Symptom:** the private-runner design used Azure Container Apps jobs, but the PR
+workflow invoked Checkov through a Docker action. Container Apps jobs do not support
+Docker-in-Docker, so the scan would fail only after an adopter switched from a hosted
+runner. **Rule:** preinstall tools in the runner image or install a pinned native CLI;
+never use Docker-based actions or Docker commands on this runner class.
 
 ### A CD apply gate flipped by a null-coalesced plan-only input
 **Symptom:** an apply gate that derives "apply vs plan" from a nullable

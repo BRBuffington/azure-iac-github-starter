@@ -29,6 +29,7 @@ names, and you have a working, opinionated pipeline on day one.
 | `policy/*.rego` | **State-safety gate** (flat-key + rebuild guards) **and a governance pack** (regions, tags, subscriptions, network, transport). All unit-tested (39 tests). |
 | `policy/governance.params.json` | Client-editable config that turns each governance guardrail on/off and scopes it. |
 | `infra/` | Minimal Terraform skeleton + `backend.hcl.example` + `configs/<scope>-<region>-<env>.tfvars` naming. |
+| `examples/cross-tenant-private-link-dns/` | Client-agnostic AVM-based Private DNS/Resolver composition plus manual-approval cross-tenant Storage DFS/Blob and Azure SQL Private Endpoints. |
 | `infra/locals.tf` | **Provenance tags** — `DeployedByRepo` (from `github.repository`) on every resource via `local.common_tags`, plus a `LastApplied` stamp the CD job writes post-apply. Lets an agent (or you, weeks later) trace what deployed a resource and when. |
 | `runners/README.md` | The **self-hosted, in-VNet, ephemeral runner** pattern (the only way to reach private-endpoint state). |
 | `.vscode/mcp.json.example` | Agent config: the Terraform + Azure MCP servers for the VS Code + GitHub Copilot authoring loop. |

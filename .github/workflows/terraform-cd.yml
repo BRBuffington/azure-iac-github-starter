@@ -64,6 +64,18 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: Validate config selector
+        run: |
+          set -euo pipefail
+          if [[ ! "$CONFIG" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]]; then
+            echo "::error::config must be a lowercase tfvars basename containing only letters, numbers, and hyphens."
+            exit 1
+          fi
+          if [[ ! -f "configs/${CONFIG}.tfvars" ]]; then
+            echo "::error::selected config does not exist under infra/configs/."
+            exit 1
+          fi
+
       - name: Setup conftest (OPA)
         run: |
           set -euo pipefail
@@ -178,6 +190,18 @@ jobs:
         with:
           terraform_wrapper: false
 
+      - name: Validate config selector
+        run: |
+          set -euo pipefail
+          if [[ ! "$CONFIG" =~ ^[a-z0-9][a-z0-9-]{0,62}$ ]]; then
+            echo "::error::config must be a lowercase tfvars basename containing only letters, numbers, and hyphens."
+            exit 1
+          fi
+          if [[ ! -f "configs/${CONFIG}.tfvars" ]]; then
+            echo "::error::selected config does not exist under infra/configs/."
+            exit 1
+          fi
+
       - name: Download plan artifact
         uses: actions/download-artifact@v4
         with:
@@ -229,6 +253,8 @@ jobs:
           fi
           DATE=$(date -u +%F)
           # Scope by DeployedByRepo (az --tag) AND DeployedConfig (JMESPath).
+          # AVM resources tagged LastAppliedStamp=Disabled keep static provenance
+          # but are excluded because module blocks cannot ignore an external tag.
           # Two discovery calls: `az resource list` returns resources but NOT
           # resource groups, so RGs are listed separately via `az group list`.
           # Capture each discovery into a variable with an EXPLICIT exit-code
@@ -236,8 +262,8 @@ jobs:
           # step, while an empty result stays a clean no-op. A previous `|| true`
           # swallowed real discovery failures, letting the run go green having
           # stamped nothing (az list exits 0 on no-match, non-zero only on error).
-          RES_IDS=$(az resource list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv) || { echo "::error::resource discovery failed (az resource list)"; exit 1; }
-          GRP_IDS=$(az group list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}'].id" -o tsv) || { echo "::error::resource-group discovery failed (az group list)"; exit 1; }
+          RES_IDS=$(az resource list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}' && tags.LastAppliedStamp!='Disabled'].id" -o tsv) || { echo "::error::resource discovery failed (az resource list)"; exit 1; }
+          GRP_IDS=$(az group list --tag "DeployedByRepo=${DEPLOYED_BY_REPO}" --query "[?tags.DeployedConfig=='${CONFIG}' && tags.LastAppliedStamp!='Disabled'].id" -o tsv) || { echo "::error::resource-group discovery failed (az group list)"; exit 1; }
           mapfile -t IDS < <(printf '%s\n%s\n' "$RES_IDS" "$GRP_IDS" | grep -v '^$' || true)
           echo "Stamping LastApplied=$DATE on ${#IDS[@]} resources/groups (DeployedByRepo=${DEPLOYED_BY_REPO}, DeployedConfig=${CONFIG})"
           STAMPED=0

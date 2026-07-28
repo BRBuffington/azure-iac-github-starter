@@ -15,6 +15,21 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-07-28 — validate config selectors before paths and queries
+The CD workflow rejects any config selector that is not a lowercase basename of
+letters, numbers, and hyphens, then verifies the corresponding tfvars file exists.
+This fail-closed gate runs in both plan and apply before the selector reaches a
+file path, artifact name, backend key, or JMESPath query.
+
+### 2026-07-28 — compose DNS with AVM; use raw PE only for manual cross-tenant approval
+The cross-tenant Private Link DNS example pins Terraform MCP catalog modules for
+Private DNS Zone (`0.5.0`) and DNS Resolver (`0.8.0`). The Private Endpoint AVM
+`0.2.0` hardcodes `is_manual_connection=false`, so the consumer-side cross-tenant
+request uses one documented raw `azurerm_private_endpoint` block with manual
+approval while the remaining resources stay on AVM. AVM-managed resources use
+`LastAppliedStamp=Disabled` because module blocks cannot express resource-level
+`ignore_changes`; static repository/config provenance remains intact.
+
 ### 2026-07-16 — AI guidance is portable; central guardrails are structurally read-only
 Added an agent-neutral `AGENTS.md`, Terraform path instructions, and a review skill so
 standing rules survive client or model changes. The optional MCP reference exposes one

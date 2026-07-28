@@ -1,12 +1,14 @@
 # PR gate: format, validate, IaC security scan, and a speculative plan.
-# Runs on every pull request that touches infra/. Read-only — no apply, no state
-# writes beyond a speculative plan (which the plan identity is read-scoped for).
+# Runs on every pull request that touches infra/ or a validated example. Read-only
+# — no apply, no state writes beyond a speculative plan (which the plan identity
+# is read-scoped for).
 name: terraform-validate
 
 on:
   pull_request:
     paths:
       - "infra/**"
+      - "examples/cross-tenant-private-link-dns/**"
       - "policy/**"
       - ".github/workflows/terraform-*.yml"
   workflow_dispatch:
@@ -110,3 +112,43 @@ jobs:
             --policy "${GITHUB_WORKSPACE}/policy" \
             --namespace governance \
             --data /tmp/params.json --no-color
+
+  validate-cross-tenant-private-link-dns-example:
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+        working-directory: examples/cross-tenant-private-link-dns
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: Install Checkov (pinned)
+        run: python -m pip install --disable-pip-version-check checkov==3.3.8
+
+      - name: IaC security scan (Checkov)
+        run: checkov --directory . --framework terraform --quiet
+
+      - name: terraform init (no backend)
+        run: terraform init -input=false -backend=false
+
+      - name: terraform validate
+        run: terraform validate
+
+      - name: terraform test (mock providers; no Azure calls)
+        run: terraform test -no-color

@@ -196,6 +196,13 @@ variable "prefixed_private_dns_zones" {
   }
 
   validation {
+    condition = length(distinct([
+      for zone in values(var.prefixed_private_dns_zones) : lower(zone.domain_name)
+    ])) == length(var.prefixed_private_dns_zones)
+    error_message = "Each prefixed domain_name must be unique, ignoring case."
+  }
+
+  validation {
     condition = alltrue(flatten([
       for zone in values(var.prefixed_private_dns_zones) : [
         for record_name, record in zone.records :

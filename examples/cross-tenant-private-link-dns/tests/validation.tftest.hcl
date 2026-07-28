@@ -57,6 +57,191 @@ run "valid_resolver_with_forwarding" {
   }
 }
 
+run "valid_prefixed_backing_configuration" {
+  command = plan
+
+  variables {
+    dns_architecture             = "prefixed_backing"
+    publish_prefixed_dns_records = true
+    private_endpoint_targets = {
+      storage_dfs = {
+        provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
+        subresource_name     = "dfs"
+        private_dns_zone_key = "dfs"
+      }
+      storage_blob = {
+        provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
+        subresource_name     = "blob"
+        private_dns_zone_key = "blob"
+      }
+    }
+    approved_private_endpoint_target_keys = ["storage_dfs", "storage_blob"]
+    prefixed_private_dns_zones = {
+      tenant_a_dfs = {
+        domain_name = "tenant-a.privatelink.dfs.core.windows.net"
+        records = {
+          stproviderexample = {
+            private_endpoint_target_key = "storage_dfs"
+            ttl                         = 60
+          }
+        }
+      }
+      tenant_a_blob = {
+        domain_name = "tenant-a.privatelink.blob.core.windows.net"
+        records = {
+          stproviderexample = {
+            private_endpoint_target_key = "storage_blob"
+            ttl                         = 60
+          }
+        }
+      }
+    }
+  }
+
+  assert {
+    condition     = length(module.private_dns_zone) == 0 && length(local.private_dns_zone_ids) == 0
+    error_message = "The prefixed architecture must not create or expose standard Private DNS zones."
+  }
+
+  assert {
+    condition     = length(module.prefixed_private_dns_zone) == 2
+    error_message = "The prefixed architecture must create each configured custom backing zone."
+  }
+
+  assert {
+    condition     = length(azurerm_private_endpoint.cross_tenant["storage_dfs"].private_dns_zone_group) == 0
+    error_message = "The prefixed architecture must not attach Azure-managed standard zone groups."
+  }
+
+  assert {
+    condition     = output.prefixed_private_dns_records["tenant_a_dfs"].records["stproviderexample"].fqdn == "stproviderexample.tenant-a.privatelink.dfs.core.windows.net"
+    error_message = "The prefixed architecture must expose deterministic backing-record metadata for the enterprise DNS bridge."
+  }
+}
+
+run "valid_prefixed_request_phase_without_dns_publication" {
+  command = plan
+
+  variables {
+    dns_architecture                   = "prefixed_backing"
+    private_dns_zone_resource_group_id = null
+  }
+
+  assert {
+    condition     = length(azurerm_private_endpoint.cross_tenant) == 1
+    error_message = "The prefixed request phase must create Private Endpoint requests before DNS publication."
+  }
+
+  assert {
+    condition     = length(module.private_dns_zone) == 0 && length(module.prefixed_private_dns_zone) == 0
+    error_message = "The prefixed request phase must not create standard or custom DNS zones."
+  }
+
+  assert {
+    condition     = length(azurerm_private_endpoint.cross_tenant["sql_server"].private_dns_zone_group) == 0
+    error_message = "The prefixed request phase must not attach a standard zone group."
+  }
+}
+
+run "reject_prefixed_zones_in_standard_architecture" {
+  command = plan
+
+  variables {
+    prefixed_private_dns_zones = {
+      tenant_a_sql = {
+        domain_name = "tenant-a.privatelink.database.windows.net"
+        records = {
+          sqlproviderexample = {
+            private_endpoint_target_key = "sql_server"
+          }
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.prefixed_private_dns_zones]
+}
+
+run "reject_prefixed_architecture_without_zones" {
+  command = plan
+
+  variables {
+    dns_architecture                      = "prefixed_backing"
+    publish_prefixed_dns_records          = true
+    approved_private_endpoint_target_keys = ["sql_server"]
+  }
+
+  expect_failures = [var.prefixed_private_dns_zones]
+}
+
+run "reject_unapproved_prefixed_record" {
+  command = plan
+
+  variables {
+    dns_architecture             = "prefixed_backing"
+    publish_prefixed_dns_records = true
+    prefixed_private_dns_zones = {
+      tenant_a_sql = {
+        domain_name = "tenant-a.privatelink.database.windows.net"
+        records = {
+          sqlproviderexample = {
+            private_endpoint_target_key = "sql_server"
+          }
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.approved_private_endpoint_target_keys]
+}
+
+run "reject_prefixed_zone_service_mismatch" {
+  command = plan
+
+  variables {
+    dns_architecture                      = "prefixed_backing"
+    publish_prefixed_dns_records          = true
+    approved_private_endpoint_target_keys = ["sql_server"]
+    prefixed_private_dns_zones = {
+      tenant_a_blob = {
+        domain_name = "tenant-a.privatelink.blob.core.windows.net"
+        records = {
+          sqlproviderexample = {
+            private_endpoint_target_key = "sql_server"
+          }
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.prefixed_private_dns_zones]
+}
+
+run "reject_existing_standard_zones_in_prefixed_architecture" {
+  command = plan
+
+  variables {
+    dns_architecture                      = "prefixed_backing"
+    publish_prefixed_dns_records          = true
+    approved_private_endpoint_target_keys = ["sql_server"]
+    existing_private_dns_zone_ids = {
+      sql = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns-consumer-eus-prd/providers/Microsoft.Network/privateDnsZones/privatelink.database.windows.net"
+    }
+    prefixed_private_dns_zones = {
+      tenant_a_sql = {
+        domain_name = "tenant-a.privatelink.database.windows.net"
+        records = {
+          sqlproviderexample = {
+            private_endpoint_target_key = "sql_server"
+          }
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.existing_private_dns_zone_ids]
+}
+
 run "reject_mismatched_zone" {
   command = plan
 

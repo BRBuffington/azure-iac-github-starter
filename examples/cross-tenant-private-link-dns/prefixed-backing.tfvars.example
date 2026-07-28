@@ -6,13 +6,17 @@ private_endpoint_subnet_id           = "/subscriptions/00000000-0000-0000-0000-0
 consumer_virtual_network_id          = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-consumer-eus-prd/providers/Microsoft.Network/virtualNetworks/vnet-consumer-eus-prd"
 private_dns_zone_resource_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns-consumer-eus-prd"
 
-# Option A is the default: Azure owns standard-zone records through PE zone groups.
-dns_architecture              = "standard_contexts"
-publish_prefixed_dns_records = false
-prefixed_private_dns_zones   = {}
+dns_architecture = "prefixed_backing"
+
+# Phase 1: keep false to create only pending Private Endpoint requests.
+# Phase 2: after Azure reports every listed connection Approved, set true and
+# populate approved_private_endpoint_target_keys with those verified keys.
+publish_prefixed_dns_records          = false
 approved_private_endpoint_target_keys = []
 
-# Set one or more keys when the consumer already owns and links these zones.
+# Standard-zone IDs are intentionally empty in prefixed mode. Terraform owns
+# the custom backing records, and enterprise DNS owns the exact bridge from the
+# standard privatelink target.
 existing_private_dns_zone_ids = {}
 
 private_endpoint_targets = {
@@ -36,6 +40,36 @@ private_endpoint_targets = {
   }
 }
 
+prefixed_private_dns_zones = {
+  tenant_a_dfs = {
+    domain_name = "tenant-a.privatelink.dfs.core.windows.net"
+    records = {
+      stproviderexample = {
+        private_endpoint_target_key = "storage_dfs"
+        ttl                         = 60
+      }
+    }
+  }
+  tenant_a_blob = {
+    domain_name = "tenant-a.privatelink.blob.core.windows.net"
+    records = {
+      stproviderexample = {
+        private_endpoint_target_key = "storage_blob"
+        ttl                         = 60
+      }
+    }
+  }
+  tenant_a_sql = {
+    domain_name = "tenant-a.privatelink.database.windows.net"
+    records = {
+      sql-provider-example = {
+        private_endpoint_target_key = "sql_server"
+        ttl                         = 60
+      }
+    }
+  }
+}
+
 # Optional Azure DNS Private Resolver in an existing VNet and delegated subnet.
 deploy_dns_resolver               = false
 dns_resolver_name                 = "dnsr-consumer-eus-prd"
@@ -45,8 +79,7 @@ dns_resolver_inbound_subnet_name  = "snet-dns-inbound"
 dns_resolver_inbound_ip           = "10.10.0.4"
 dns_resolver_outbound_subnet_name = "snet-dns-outbound"
 
-# Azure outbound rules are for enterprise-owned namespaces only. Central DNS
-# forwards the public service zones to this resolver in the opposite direction.
+# Azure outbound rules are only for enterprise-owned namespaces.
 enterprise_forwarding_rules = {
   corporate_internal = {
     domain_name = "corp.example."

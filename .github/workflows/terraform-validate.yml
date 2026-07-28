@@ -60,8 +60,11 @@ jobs:
       - name: Install Checkov (pinned)
         run: python -m pip install --disable-pip-version-check checkov==3.3.8
 
+      - name: Test fail-closed Checkov gate
+        run: python "${GITHUB_WORKSPACE}/.github/scripts/test_checkov_fail_closed.py"
+
       - name: IaC security scan (Checkov)
-        run: checkov --directory . --framework terraform --quiet
+        run: python "${GITHUB_WORKSPACE}/.github/scripts/checkov_fail_closed.py" --directory .
 
       - name: terraform init (no backend — validate only)
         # A template repo has no remote state to reach. Init without the backend
@@ -141,8 +144,11 @@ jobs:
       - name: Install Checkov (pinned)
         run: python -m pip install --disable-pip-version-check checkov==3.3.8
 
+      - name: Test fail-closed Checkov gate
+        run: python "${GITHUB_WORKSPACE}/.github/scripts/test_checkov_fail_closed.py"
+
       - name: IaC security scan (Checkov)
-        run: checkov --directory . --framework terraform --quiet
+        run: python "${GITHUB_WORKSPACE}/.github/scripts/checkov_fail_closed.py" --directory .
 
       - name: terraform init (no backend)
         run: terraform init -input=false -backend=false

@@ -38,6 +38,17 @@ variable "consumer_virtual_network_id" {
   description = "Consumer virtual network resource ID linked to newly created private DNS zones."
 }
 
+variable "dns_architecture" {
+  type        = string
+  description = "DNS record ownership model: standard_contexts uses Azure-managed standard zone groups; prefixed_backing uses Terraform-managed custom backing-zone records."
+  default     = "standard_contexts"
+
+  validation {
+    condition     = contains(["standard_contexts", "prefixed_backing"], var.dns_architecture)
+    error_message = "dns_architecture must be standard_contexts or prefixed_backing."
+  }
+}
+
 variable "private_dns_zone_resource_group_id" {
   type        = string
   description = "Existing resource group ID for private DNS zones. Required when any standard zone is created by this example."
@@ -45,11 +56,26 @@ variable "private_dns_zone_resource_group_id" {
   nullable    = true
 
   validation {
-    condition = var.private_dns_zone_resource_group_id != null || alltrue([
-      for key in distinct([for target in values(var.private_endpoint_targets) : target.private_dns_zone_key]) :
-      contains(keys(var.existing_private_dns_zone_ids), key)
-    ])
-    error_message = "private_dns_zone_resource_group_id is required for every requested zone not supplied in existing_private_dns_zone_ids."
+    condition = var.dns_architecture == "prefixed_backing" ? (
+      !var.publish_prefixed_dns_records || var.private_dns_zone_resource_group_id != null
+      ) : (
+      var.private_dns_zone_resource_group_id != null || alltrue([
+        for key in distinct([for target in values(var.private_endpoint_targets) : target.private_dns_zone_key]) :
+        contains(keys(var.existing_private_dns_zone_ids), key)
+      ])
+    )
+    error_message = "private_dns_zone_resource_group_id is required for prefixed backing zones and for every standard zone not supplied in existing_private_dns_zone_ids."
+  }
+}
+
+variable "publish_prefixed_dns_records" {
+  type        = bool
+  description = "Create prefixed backing zones and records after provider-side Private Endpoint approval has been verified."
+  default     = false
+
+  validation {
+    condition     = var.dns_architecture == "prefixed_backing" || !var.publish_prefixed_dns_records
+    error_message = "publish_prefixed_dns_records can be true only when dns_architecture is prefixed_backing."
   }
 }
 
@@ -63,6 +89,11 @@ variable "existing_private_dns_zone_ids" {
       for key in keys(var.existing_private_dns_zone_ids) : contains(["dfs", "blob", "sql"], key)
     ])
     error_message = "existing_private_dns_zone_ids keys must be dfs, blob, or sql."
+  }
+
+  validation {
+    condition     = var.dns_architecture == "standard_contexts" || length(var.existing_private_dns_zone_ids) == 0
+    error_message = "existing_private_dns_zone_ids applies only to the standard_contexts architecture."
   }
 }
 
@@ -129,6 +160,90 @@ variable "private_endpoint_targets" {
       for target in values(var.private_endpoint_targets) : length(target.request_message) <= 128
     ])
     error_message = "request_message must be 128 characters or fewer so it is valid for Azure SQL and Storage."
+  }
+}
+
+variable "prefixed_private_dns_zones" {
+  type = map(object({
+    domain_name = string
+    records = map(object({
+      private_endpoint_target_key = string
+      ttl                         = optional(number, 60)
+    }))
+  }))
+  description = "Custom tenant- or region-prefixed backing zones and explicit A records. Used only with dns_architecture=prefixed_backing."
+  default     = {}
+
+  validation {
+    condition = (
+      var.dns_architecture == "prefixed_backing" && (
+        !var.publish_prefixed_dns_records || length(var.prefixed_private_dns_zones) > 0
+      )
+      ) || (
+      var.dns_architecture == "standard_contexts" && length(var.prefixed_private_dns_zones) == 0
+    )
+    error_message = "prefixed_private_dns_zones applies only to prefixed_backing and must be non-empty when record publication is enabled."
+  }
+
+  validation {
+    condition = alltrue([
+      for zone in values(var.prefixed_private_dns_zones) : can(regex(
+        "(?i)^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\\.privatelink\\.(?:(?:dfs|blob)\\.core\\.windows\\.net|database\\.windows\\.net)$",
+        zone.domain_name
+      ))
+    ])
+    error_message = "Each prefixed domain_name must add at least one label before a supported standard privatelink DFS, Blob, or SQL zone suffix."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for zone in values(var.prefixed_private_dns_zones) : [
+        for record_name, record in zone.records :
+        can(regex("^[a-z0-9][a-z0-9-]{0,62}$", record_name)) && record.ttl >= 30 && record.ttl <= 86400
+      ]
+    ]))
+    error_message = "Prefixed record names must be DNS labels and TTLs must be between 30 and 86400 seconds."
+  }
+
+  validation {
+    condition = alltrue(flatten([
+      for zone in values(var.prefixed_private_dns_zones) : [
+        for record in values(zone.records) : try(
+          endswith(lower(zone.domain_name), {
+            dfs  = ".privatelink.dfs.core.windows.net"
+            blob = ".privatelink.blob.core.windows.net"
+            sql  = ".privatelink.database.windows.net"
+          }[var.private_endpoint_targets[record.private_endpoint_target_key].private_dns_zone_key]),
+          false
+        )
+      ]
+    ]))
+    error_message = "Every prefixed record must reference an existing private endpoint target whose DFS, Blob, or SQL family matches the zone suffix."
+  }
+}
+
+variable "approved_private_endpoint_target_keys" {
+  type        = set(string)
+  description = "Endpoint target keys independently verified as Approved before custom prefixed records are published."
+  default     = []
+
+  validation {
+    condition = alltrue([
+      for key in var.approved_private_endpoint_target_keys : contains(keys(var.private_endpoint_targets), key)
+    ])
+    error_message = "Every approved_private_endpoint_target_keys value must exist in private_endpoint_targets."
+  }
+
+  validation {
+    condition = !var.publish_prefixed_dns_records || alltrue(flatten([
+      for zone in values(var.prefixed_private_dns_zones) : [
+        for record in values(zone.records) : contains(
+          var.approved_private_endpoint_target_keys,
+          record.private_endpoint_target_key
+        )
+      ]
+    ]))
+    error_message = "Every prefixed record target must be listed in approved_private_endpoint_target_keys before publication."
   }
 }
 

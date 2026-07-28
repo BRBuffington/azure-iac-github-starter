@@ -30,6 +30,11 @@ run "valid_sql_configuration" {
     condition     = local.avm_tags.LastAppliedStamp == "Disabled"
     error_message = "AVM-managed resources must remain excluded from the external LastApplied stamp."
   }
+
+  assert {
+    condition     = length(azurerm_private_endpoint.cross_tenant["sql_server"].private_dns_zone_group) == 1
+    error_message = "The default standard_contexts architecture must attach exactly one Azure-managed zone group."
+  }
 }
 
 run "valid_resolver_with_forwarding" {
@@ -205,6 +210,36 @@ run "reject_prefixed_zone_service_mismatch" {
     prefixed_private_dns_zones = {
       tenant_a_blob = {
         domain_name = "tenant-a.privatelink.blob.core.windows.net"
+        records = {
+          sqlproviderexample = {
+            private_endpoint_target_key = "sql_server"
+          }
+        }
+      }
+    }
+  }
+
+  expect_failures = [var.prefixed_private_dns_zones]
+}
+
+run "reject_duplicate_prefixed_zone_names" {
+  command = plan
+
+  variables {
+    dns_architecture                      = "prefixed_backing"
+    publish_prefixed_dns_records          = true
+    approved_private_endpoint_target_keys = ["sql_server"]
+    prefixed_private_dns_zones = {
+      tenant_a_sql = {
+        domain_name = "tenant-a.privatelink.database.windows.net"
+        records = {
+          sqlproviderexample = {
+            private_endpoint_target_key = "sql_server"
+          }
+        }
+      }
+      duplicate_tenant_a_sql = {
+        domain_name = "TENANT-A.PRIVATELINK.DATABASE.WINDOWS.NET"
         records = {
           sqlproviderexample = {
             private_endpoint_target_key = "sql_server"

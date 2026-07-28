@@ -19,9 +19,13 @@ resource "azurerm_private_endpoint" "cross_tenant" {
     request_message                = each.value.request_message
   }
 
-  private_dns_zone_group {
-    name                 = "default"
-    private_dns_zone_ids = [local.private_dns_zone_ids[each.value.private_dns_zone_key]]
+  dynamic "private_dns_zone_group" {
+    for_each = var.dns_architecture == "standard_contexts" ? [each.value.private_dns_zone_key] : []
+
+    content {
+      name                 = "default"
+      private_dns_zone_ids = [local.private_dns_zone_ids[private_dns_zone_group.value]]
+    }
   }
 
   lifecycle {

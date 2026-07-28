@@ -10,6 +10,7 @@ import sys
 from typing import Any
 
 _DOWNLOAD_FAILURE = "failed to download module"
+_REQUIRED_COUNTS = ("passed", "failed", "skipped", "parsing_errors")
 
 
 def assess_result(returncode: int, stdout: str, stderr: str) -> tuple[bool, str]:
@@ -31,13 +32,16 @@ def assess_result(returncode: int, stdout: str, stderr: str) -> tuple[bool, str]
 
     passed = failed = skipped = parsing_errors = failed_check_details = 0
     for envelope in envelopes:
-        summary = envelope.get("summary")
-        results = envelope.get("results")
-        if not isinstance(summary, dict) or not isinstance(results, dict):
-            return False, "Checkov JSON is missing summary or results."
+        if all(key in envelope for key in _REQUIRED_COUNTS):
+            summary = envelope
+            results = None
+        else:
+            summary = envelope.get("summary")
+            results = envelope.get("results")
+            if not isinstance(summary, dict) or not isinstance(results, dict):
+                return False, "Checkov JSON is missing its result summary."
 
-        required_counts = ("passed", "failed", "skipped", "parsing_errors")
-        if not all(key in summary for key in required_counts):
+        if not all(key in summary for key in _REQUIRED_COUNTS):
             return False, "Checkov summary is missing a required result count."
         try:
             passed += int(summary["passed"])
@@ -47,10 +51,11 @@ def assess_result(returncode: int, stdout: str, stderr: str) -> tuple[bool, str]
         except (TypeError, ValueError):
             return False, "Checkov summary counts are not numeric."
 
-        failed_checks = results.get("failed_checks")
-        if not isinstance(failed_checks, list):
-            return False, "Checkov JSON has an invalid failed_checks field."
-        failed_check_details += len(failed_checks)
+        if results is not None:
+            failed_checks = results.get("failed_checks")
+            if not isinstance(failed_checks, list):
+                return False, "Checkov JSON has an invalid failed_checks field."
+            failed_check_details += len(failed_checks)
 
     summary_text = (
         f"passed={passed} failed={failed} skipped={skipped} "
@@ -70,28 +75,36 @@ def _checkov_command() -> list[str]:
     return ["checkov"]
 
 
+def authored_terraform_files(directory: pathlib.Path) -> list[pathlib.Path]:
+    ignored_directories = {".terraform", ".external_modules"}
+    return [
+        path
+        for path in sorted(directory.rglob("*.tf"))
+        if not ignored_directories.intersection(path.relative_to(directory).parts)
+    ]
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--directory", required=True)
-    parser.add_argument("--external-modules-download-path")
     args = parser.parse_args(argv)
+
+    directory = pathlib.Path(args.directory).resolve()
+    terraform_files = authored_terraform_files(directory)
+    if not terraform_files:
+        print(f"No repository-authored Terraform files found under {directory}.", file=sys.stderr)
+        return 1
 
     command = [
         *_checkov_command(),
-        "--directory",
-        args.directory,
+        "--file",
+        *(str(path) for path in terraform_files),
         "--framework",
         "terraform",
-        "--download-external-modules",
-        "true",
         "--output",
         "json",
         "--quiet",
     ]
-    if args.external_modules_download_path:
-        command.extend(
-            ["--external-modules-download-path", args.external_modules_download_path]
-        )
 
     try:
         completed = subprocess.run(command, text=True, capture_output=True, check=False)

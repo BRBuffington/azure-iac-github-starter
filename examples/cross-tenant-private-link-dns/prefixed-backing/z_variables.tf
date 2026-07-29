@@ -35,76 +35,35 @@ variable "private_endpoint_subnet_id" {
 
 variable "consumer_virtual_network_id" {
   type        = string
-  description = "Consumer virtual network resource ID linked to newly created private DNS zones."
+  description = "Consumer virtual network resource ID linked to newly created prefixed Private DNS zones."
 }
 
-variable "dns_architecture" {
+variable "prefixed_dns_zone_resource_group_id" {
   type        = string
-  description = "DNS record ownership model: standard_contexts uses Azure-managed standard zone groups; prefixed_backing uses Terraform-managed custom backing-zone records."
-  default     = "standard_contexts"
-
-  validation {
-    condition     = contains(["standard_contexts", "prefixed_backing"], var.dns_architecture)
-    error_message = "dns_architecture must be standard_contexts or prefixed_backing."
-  }
-}
-
-variable "private_dns_zone_resource_group_id" {
-  type        = string
-  description = "Existing resource group ID for private DNS zones. Required when any standard zone is created by this example."
+  description = "Existing resource group ID for prefixed Private DNS backing zones."
   default     = null
   nullable    = true
 
   validation {
-    condition = var.dns_architecture == "prefixed_backing" ? (
-      !var.publish_prefixed_dns_records || var.private_dns_zone_resource_group_id != null
-      ) : (
-      var.private_dns_zone_resource_group_id != null || alltrue([
-        for key in distinct([for target in values(var.private_endpoint_targets) : target.private_dns_zone_key]) :
-        contains(keys(var.existing_private_dns_zone_ids), key)
-      ])
-    )
-    error_message = "private_dns_zone_resource_group_id is required for prefixed backing zones and for every standard zone not supplied in existing_private_dns_zone_ids."
+    condition     = !var.publish_dns_records || var.prefixed_dns_zone_resource_group_id != null
+    error_message = "prefixed_dns_zone_resource_group_id is required when DNS record publication is enabled."
   }
 }
 
-variable "publish_prefixed_dns_records" {
+variable "publish_dns_records" {
   type        = bool
   description = "Create prefixed backing zones and records after provider-side Private Endpoint approval has been verified."
   default     = false
-
-  validation {
-    condition     = var.dns_architecture == "prefixed_backing" || !var.publish_prefixed_dns_records
-    error_message = "publish_prefixed_dns_records can be true only when dns_architecture is prefixed_backing."
-  }
-}
-
-variable "existing_private_dns_zone_ids" {
-  type        = map(string)
-  description = "Existing consumer private DNS zone IDs keyed by dfs, blob, or sql. Existing zones must already be linked to the consumer VNet."
-  default     = {}
-
-  validation {
-    condition = alltrue([
-      for key in keys(var.existing_private_dns_zone_ids) : contains(["dfs", "blob", "sql"], key)
-    ])
-    error_message = "existing_private_dns_zone_ids keys must be dfs, blob, or sql."
-  }
-
-  validation {
-    condition     = var.dns_architecture == "standard_contexts" || length(var.existing_private_dns_zone_ids) == 0
-    error_message = "existing_private_dns_zone_ids applies only to the standard_contexts architecture."
-  }
 }
 
 variable "private_endpoint_targets" {
   type = map(object({
     provider_resource_id = string
     subresource_name     = string
-    private_dns_zone_key = string
+    dns_family           = string
     request_message      = optional(string, "Cross-tenant private endpoint request")
   }))
-  description = "Provider resource IDs and subresources. Use dfs and blob for ADLS Gen2, and sqlServer for Azure SQL."
+  description = "Provider resource IDs, subresources, and matching DFS, Blob, or SQL DNS families."
 
   validation {
     condition     = length(var.private_endpoint_targets) > 0
@@ -122,13 +81,13 @@ variable "private_endpoint_targets" {
   validation {
     condition = alltrue([
       for target in values(var.private_endpoint_targets) :
-      target.private_dns_zone_key == {
+      target.dns_family == {
         dfs       = "dfs"
         blob      = "blob"
         sqlServer = "sql"
       }[target.subresource_name]
     ])
-    error_message = "private_dns_zone_key must match the subresource: dfs=dfs, blob=blob, and sqlServer=sql."
+    error_message = "dns_family must match the subresource: dfs=dfs, blob=blob, and sqlServer=sql."
   }
 
   validation {
@@ -171,18 +130,12 @@ variable "prefixed_private_dns_zones" {
       ttl                         = optional(number, 60)
     }))
   }))
-  description = "Custom tenant- or region-prefixed backing zones and explicit A records. Used only with dns_architecture=prefixed_backing."
+  description = "Custom tenant- or region-prefixed backing zones and explicit A records."
   default     = {}
 
   validation {
-    condition = (
-      var.dns_architecture == "prefixed_backing" && (
-        !var.publish_prefixed_dns_records || length(var.prefixed_private_dns_zones) > 0
-      )
-      ) || (
-      var.dns_architecture == "standard_contexts" && length(var.prefixed_private_dns_zones) == 0
-    )
-    error_message = "prefixed_private_dns_zones applies only to prefixed_backing and must be non-empty when record publication is enabled."
+    condition     = !var.publish_dns_records || length(var.prefixed_private_dns_zones) > 0
+    error_message = "prefixed_private_dns_zones must be non-empty when DNS record publication is enabled."
   }
 
   validation {
@@ -192,7 +145,7 @@ variable "prefixed_private_dns_zones" {
         zone.domain_name
       ))
     ])
-    error_message = "Each prefixed domain_name must add at least one label before a supported standard privatelink DFS, Blob, or SQL zone suffix."
+    error_message = "Each prefixed domain_name must add at least one label before a supported standard privatelink DFS, Blob, or SQL suffix."
   }
 
   validation {
@@ -220,29 +173,29 @@ variable "prefixed_private_dns_zones" {
             dfs  = ".privatelink.dfs.core.windows.net"
             blob = ".privatelink.blob.core.windows.net"
             sql  = ".privatelink.database.windows.net"
-          }[var.private_endpoint_targets[record.private_endpoint_target_key].private_dns_zone_key]),
+          }[var.private_endpoint_targets[record.private_endpoint_target_key].dns_family]),
           false
         )
       ]
     ]))
-    error_message = "Every prefixed record must reference an existing private endpoint target whose DFS, Blob, or SQL family matches the zone suffix."
+    error_message = "Every prefixed record must reference an existing endpoint target whose DFS, Blob, or SQL family matches the zone suffix."
   }
 }
 
 variable "approved_private_endpoint_target_keys" {
   type        = set(string)
-  description = "Endpoint target keys independently verified as Approved before custom prefixed records are published."
+  description = "Endpoint target keys independently verified as Approved before custom records are published."
   default     = []
 
   validation {
     condition = alltrue([
       for key in var.approved_private_endpoint_target_keys : contains(keys(var.private_endpoint_targets), key)
     ])
-    error_message = "Every approved_private_endpoint_target_keys value must exist in private_endpoint_targets."
+    error_message = "Every approved key must exist in private_endpoint_targets."
   }
 
   validation {
-    condition = !var.publish_prefixed_dns_records || alltrue(flatten([
+    condition = !var.publish_dns_records || alltrue(flatten([
       for zone in values(var.prefixed_private_dns_zones) : [
         for record in values(zone.records) : contains(
           var.approved_private_endpoint_target_keys,
@@ -295,7 +248,7 @@ variable "dns_resolver_inbound_subnet_name" {
 
 variable "dns_resolver_inbound_ip" {
   type        = string
-  description = "Optional static inbound endpoint IP. A static address is recommended for enterprise DNS forwarding."
+  description = "Optional static inbound endpoint IP."
   default     = null
   nullable    = true
 
@@ -325,7 +278,7 @@ variable "enterprise_forwarding_rules" {
     domain_name              = string
     destination_ip_addresses = map(string)
   }))
-  description = "Optional enterprise-owned namespaces forwarded from Azure to central DNS. Map each DNS server IP to port 53 as a string."
+  description = "Optional enterprise-owned namespaces forwarded from Azure to central DNS."
   default     = {}
 
   validation {

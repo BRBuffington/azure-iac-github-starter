@@ -1,9 +1,9 @@
 # Cross-tenant Private Link DNS starter
 
-This client-agnostic example creates consumer-local Private Endpoints and
-Private DNS for Azure Storage Data Lake Storage Gen2 and Azure SQL resources in
-another tenant or subscription. It supports two explicit DNS architectures and
-optionally deploys an Azure DNS Private Resolver.
+This directory is a catalog of two independent Terraform roots for
+cross-tenant Azure Private Link DNS. Choose one option and copy only that child
+directory into the client repository. The parent directory contains no
+deployable Terraform and no architecture selector.
 
 ## Design contract
 
@@ -15,10 +15,8 @@ optionally deploys an Azure DNS Private Resolver.
   `privatelink.*` zones to every client.
 - Create consumer-local Private Endpoints by full provider resource ID. The
   provider independently approves each pending connection.
-- Choose exactly one DNS record owner per deployment:
-  `standard_contexts` attaches standard Private DNS zone groups so Azure owns
-  record lifecycle; `prefixed_backing` omits zone groups and makes Terraform
-  own explicit custom backing records.
+- Choose exactly one child implementation and one DNS record owner per
+  deployment. Do not compose the two roots together.
 - ADLS Gen2 requires both `dfs` and `blob` endpoints and zones.
 - Applications keep using normal service FQDNs. Azure SQL clients use
   `<server>.database.windows.net`, never a raw private IP or the
@@ -28,13 +26,13 @@ optionally deploys an Azure DNS Private Resolver.
 
 ## Choose the DNS architecture
 
-### Option A: standard contexts (default)
+### Option A: [`standard-contexts/`](standard-contexts/)
 
-Use `dns_architecture = "standard_contexts"` when enterprise DNS can classify
-clients into stable consumer contexts or send them to distinct service
-listeners. Enterprise DNS forwards the public service zones to same-authority
-consumer resolver endpoints. The standard `privatelink.*` zones stay linked to
-the consumer VNet, and each Private Endpoint zone group owns its records.
+Use this standalone root when enterprise DNS can classify clients into stable
+consumer contexts or send them to distinct service listeners. Enterprise DNS
+forwards the public service zones to same-authority consumer resolver
+endpoints. Standard `privatelink.*` zones stay linked to the consumer VNet, and
+each Private Endpoint zone group owns its records.
 
 Query flow:
 
@@ -46,13 +44,13 @@ client -> enterprise DNS context -> public service-zone forward
 This is the baseline architecture because it keeps Microsoft's normal service
 FQDNs and Azure-managed record lifecycle.
 
-### Option B: prefixed backing zones (opt-in)
+### Option B: [`prefixed-backing/`](prefixed-backing/)
 
-Use `dns_architecture = "prefixed_backing"` only for an explicit resource
-allowlist when one context must represent multiple same-named authorities or a
-measured requirement needs health- or topology-aware endpoint selection.
-Terraform creates tenant- or region-prefixed backing zones and explicit A
-records. Enterprise DNS must separately own the exact bridge from the standard
+Use this standalone root only for an explicit resource allowlist when one
+context must represent multiple same-named authorities or a measured
+requirement needs health- or topology-aware endpoint selection. Terraform
+creates tenant- or region-prefixed backing zones and explicit A records.
+Enterprise DNS separately owns the exact bridge from the standard
 `privatelink` target to the prefixed name or selected endpoint.
 
 Query flow:
@@ -68,12 +66,12 @@ target the standard `privatelink` name. Do not use wildcard capture of
 
 Option B is deliberately two phase:
 
-1. Set `publish_prefixed_dns_records = false` and apply the consumer-local
-  Private Endpoint requests without DNS records.
+1. Set `publish_dns_records = false` and apply the consumer-local Private
+  Endpoint requests without DNS records.
 2. The provider validates and approves each request.
 3. Verify `Approved` through Azure, add the approved target keys to
-  `approved_private_endpoint_target_keys`, and set
-  `publish_prefixed_dns_records = true`.
+    `approved_private_endpoint_target_keys`, and set
+    `publish_dns_records = true`.
 4. Apply the prefixed zones and records, then configure and validate the exact
   enterprise DNS bridge.
 
@@ -91,30 +89,22 @@ The template uses current Terraform MCP catalog examples and pins:
 
 The Private Endpoint AVM currently hardcodes automatic approval. Cross-tenant
 consumers normally require `is_manual_connection = true`, so
-`cross_tenant_private_endpoints.tf` is a documented direct AzureRM exception
-based on the provider schema returned by Terraform MCP.
+Each child root contains its own `cross_tenant_private_endpoints.tf` direct
+AzureRM exception based on the provider schema returned by Terraform MCP.
 
 ## Use
 
+Run from the selected child directory only:
+
 ```bash
+cd standard-contexts  # or: cd prefixed-backing
 cp terraform.tfvars.example terraform.tfvars
-# Replace every placeholder and remove optional resolver values not in scope.
 terraform fmt -check -recursive
 terraform init -backend=false -input=false
-terraform validate
+terraform validate -no-color
+terraform test -no-color
 terraform plan -input=false -out=tfplan
 terraform show -json tfplan > tfplan.json
-```
-
-For the prefixed-backing path:
-
-```bash
-cp prefixed-backing.tfvars.example prefixed-backing.tfvars
-# Replace every placeholder. Start with publish_prefixed_dns_records=false.
-terraform fmt -check -recursive
-terraform init -backend=false -input=false
-terraform validate
-terraform plan -input=false -var-file=prefixed-backing.tfvars -out=tfplan
 ```
 
 Do not apply this example locally. Integrate it into the governed pipeline in

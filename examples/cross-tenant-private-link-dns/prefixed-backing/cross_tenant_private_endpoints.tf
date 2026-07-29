@@ -1,7 +1,6 @@
 # The AVM private endpoint module 0.2.0 hardcodes is_manual_connection=false.
 # Cross-tenant consumers normally lack approval rights on the provider resource,
 # so this focused raw AzureRM resource is required to create a pending request.
-# The provider tenant must independently approve each connection.
 resource "azurerm_private_endpoint" "cross_tenant" {
   for_each = var.private_endpoint_targets
 
@@ -17,15 +16,6 @@ resource "azurerm_private_endpoint" "cross_tenant" {
     subresource_names              = [each.value.subresource_name]
     is_manual_connection           = true
     request_message                = each.value.request_message
-  }
-
-  dynamic "private_dns_zone_group" {
-    for_each = var.dns_architecture == "standard_contexts" ? [each.value.private_dns_zone_key] : []
-
-    content {
-      name                 = "default"
-      private_dns_zone_ids = [local.private_dns_zone_ids[private_dns_zone_group.value]]
-    }
   }
 
   lifecycle {

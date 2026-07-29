@@ -11,18 +11,13 @@ output "private_endpoint_private_ip_addresses" {
   }
 }
 
-output "private_dns_zone_ids" {
-  description = "Standard consumer-owned private DNS zone IDs keyed by dfs, blob, or sql. Empty for the prefixed_backing architecture."
-  value       = local.private_dns_zone_ids
-}
-
 output "prefixed_private_dns_zone_ids" {
-  description = "Terraform-owned custom backing-zone IDs keyed by the configured prefixed zone key."
+  description = "Terraform-owned custom backing-zone IDs keyed by configured zone key."
   value       = { for key, zone in module.prefixed_private_dns_zone : key => zone.resource_id }
 }
 
 output "prefixed_private_dns_records" {
-  description = "Custom backing-record contract for configuring and validating the exact enterprise DNS standard-name bridge."
+  description = "Custom backing-record contract for configuring and validating the enterprise DNS standard-name bridge."
   value = {
     for zone_key, zone in var.prefixed_private_dns_zones : zone_key => {
       domain_name = zone.domain_name
@@ -39,6 +34,6 @@ output "prefixed_private_dns_records" {
 }
 
 output "dns_resolver_inbound_endpoints" {
-  description = "Optional DNS Resolver inbound endpoint outputs for enterprise DNS forwarding."
+  description = "Optional DNS Resolver inbound endpoint outputs for enterprise DNS integration."
   value       = var.deploy_dns_resolver ? module.dns_resolver[0].inbound_endpoints : {}
 }

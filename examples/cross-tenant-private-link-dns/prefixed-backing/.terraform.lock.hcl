@@ -5,7 +5,6 @@ provider "registry.terraform.io/azure/azapi" {
   version     = "2.11.0"
   constraints = "~> 2.0, ~> 2.4, ~> 2.5"
   hashes = [
-    "h1:N7fwvwD7BAPC1VZMONfI8Dy+M80WTsQfC0Dk0ktvZm8=",
     "h1:SfbC7Fp2gMGXOzZlPHcirTKDNhKjXYjymMtD/PGpD68=",
     "zh:05ae9abf23abf003229e9e04734fce2b881974b0df4313083a890d9f67b1fc35",
     "zh:1dc85011f0dc8480d34d4fab9fe90de56e171d99b8b19d7b65b0f3ed2af20376",
@@ -26,7 +25,6 @@ provider "registry.terraform.io/azure/modtm" {
   version     = "0.4.0"
   constraints = "~> 0.3"
   hashes = [
-    "h1:AZf16AqJYD0dj9TXCMim1pJlaSAY0qZOAXV5CJ02wR8=",
     "h1:hn9exdW9Le7aLlFFAfMBqhN8xPufO85Ki9JsHMupwzw=",
     "zh:077eeaff6666bd1ee28b5c28c6613ddf162beb7a0230b84a2fe1d6d943174f8e",
     "zh:2b301bdd7031daa0afac77596fe662c359bb2dd96b681cd70e916db8637d5006",
@@ -48,7 +46,6 @@ provider "registry.terraform.io/hashicorp/azurerm" {
   constraints = "~> 4.36"
   hashes = [
     "h1:4BEgtU/crlkbMduT7tm8Sp3+C+1RBfrpUIlTBM/wtMc=",
-    "h1:olVprUWhmFTARlydw/r7VIx4fata2gy3zsAWfPGRrhg=",
     "zh:0732e7b74264ddfa2b90ba69d01c283d3cbae9f72ed3e506c6ac92529fed7fd3",
     "zh:12afb524e232fe4e3d6161927724af5dfa4831d71edd9c174917ca9b7377bfae",
     "zh:169d619ae202c4145e02fb706fb7c3679445ab3e3ff722edbf89597517a8c92e",
@@ -68,7 +65,6 @@ provider "registry.terraform.io/hashicorp/random" {
   version     = "3.9.0"
   constraints = ">= 3.5.0, >= 3.5.1, ~> 3.6, < 5.0.0"
   hashes = [
-    "h1:UlBuNVuCGJ39tTv2c5gz2NRZnQbXfbIWbTzWcth5o74=",
     "h1:q/uaUTBdKgAmZESrwsoeDQff9uUA/cI/N5ZKNgVwa9c=",
     "zh:161ad0bd9a75768c82f53fb6e7172a9d8be2d4889b012645a34795031aaf1bf1",
     "zh:19dc9a5b17729725ccfc4f45b0500af0ee5bc6b6b160c7adb8f2bf617d2c80ea",
@@ -91,7 +87,6 @@ provider "registry.terraform.io/hashicorp/time" {
   constraints = "~> 0.13"
   hashes = [
     "h1:+nUGGWxp4gQCusc6Sa+FLSQfHUPWh7YaQV6qrWV9exo=",
-    "h1:4EThC3ocCFiFPMZQSUvSGSxoJqBcGWxMcFYmL67uS7Y=",
     "zh:12abfd6b800e4d7fa6db7310dec8ffd440b31993861ef188c7ed5260b3073937",
     "zh:23005521e800bb19e1597bf755c5f70d675d30b685d4255001ed5fa47d9df3f1",
     "zh:2fea249b582ae97cd1cc10385187ea50993bb47c28cc5df0305e57ceaabf0a10",

@@ -1,31 +1,8 @@
-# Terraform MCP catalog source:
-# Azure/avm-res-network-privatednszone/azurerm, version 0.5.0.
-module "private_dns_zone" {
-  # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.5.0 release returned by Terraform MCP.
-  for_each = local.private_dns_zones_to_create
-
-  source  = "Azure/avm-res-network-privatednszone/azurerm"
-  version = "0.5.0"
-
-  domain_name = each.value
-  parent_id   = var.private_dns_zone_resource_group_id
-  tags        = local.avm_tags
-
-  virtual_network_links = {
-    consumer = {
-      name                                   = "link-${var.name_prefix}-${each.key}"
-      virtual_network_id                     = var.consumer_virtual_network_id
-      registration_enabled                   = false
-      private_dns_zone_supports_private_link = true
-    }
-  }
-}
-
 # Custom backing zones are not part of Azure's standard Private Endpoint DNS
 # integration. Terraform owns these records, while enterprise DNS owns the
 # exact standard-name bridge and any health-aware selection policy.
-resource "terraform_data" "prefixed_dns_publication_gate" {
-  count = var.publish_prefixed_dns_records ? 1 : 0
+resource "terraform_data" "dns_publication_gate" {
+  count = var.publish_dns_records ? 1 : 0
 
   lifecycle {
     precondition {
@@ -42,15 +19,17 @@ resource "terraform_data" "prefixed_dns_publication_gate" {
   }
 }
 
+# Terraform MCP catalog source:
+# Azure/avm-res-network-privatednszone/azurerm, version 0.5.0.
 module "prefixed_private_dns_zone" {
   # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.5.0 release returned by Terraform MCP.
-  for_each = var.publish_prefixed_dns_records ? var.prefixed_private_dns_zones : {}
+  for_each = var.publish_dns_records ? var.prefixed_private_dns_zones : {}
 
   source  = "Azure/avm-res-network-privatednszone/azurerm"
   version = "0.5.0"
 
   domain_name = each.value.domain_name
-  parent_id   = var.private_dns_zone_resource_group_id
+  parent_id   = var.prefixed_dns_zone_resource_group_id
   tags        = local.avm_tags
 
   a_records = {
@@ -72,5 +51,5 @@ module "prefixed_private_dns_zone" {
     }
   }
 
-  depends_on = [terraform_data.prefixed_dns_publication_gate]
+  depends_on = [terraform_data.dns_publication_gate]
 }

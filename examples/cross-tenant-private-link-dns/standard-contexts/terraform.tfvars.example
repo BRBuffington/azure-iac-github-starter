@@ -6,12 +6,6 @@ private_endpoint_subnet_id           = "/subscriptions/00000000-0000-0000-0000-0
 consumer_virtual_network_id          = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-consumer-eus-prd/providers/Microsoft.Network/virtualNetworks/vnet-consumer-eus-prd"
 private_dns_zone_resource_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns-consumer-eus-prd"
 
-# Option A is the default: Azure owns standard-zone records through PE zone groups.
-dns_architecture              = "standard_contexts"
-publish_prefixed_dns_records = false
-prefixed_private_dns_zones   = {}
-approved_private_endpoint_target_keys = []
-
 # Set one or more keys when the consumer already owns and links these zones.
 existing_private_dns_zone_ids = {}
 

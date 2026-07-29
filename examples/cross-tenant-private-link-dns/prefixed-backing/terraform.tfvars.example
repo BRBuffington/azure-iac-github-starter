@@ -4,38 +4,31 @@ name_prefix                          = "consumer-prd"
 private_endpoint_resource_group_name = "rg-network-consumer-eus-prd"
 private_endpoint_subnet_id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-consumer-eus-prd/providers/Microsoft.Network/virtualNetworks/vnet-consumer-eus-prd/subnets/snet-private-endpoints"
 consumer_virtual_network_id          = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-consumer-eus-prd/providers/Microsoft.Network/virtualNetworks/vnet-consumer-eus-prd"
-private_dns_zone_resource_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns-consumer-eus-prd"
-
-dns_architecture = "prefixed_backing"
+prefixed_dns_zone_resource_group_id  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns-consumer-eus-prd"
 
 # Phase 1: keep false to create only pending Private Endpoint requests.
 # Phase 2: after Azure reports every listed connection Approved, set true and
 # populate approved_private_endpoint_target_keys with those verified keys.
-publish_prefixed_dns_records          = false
+publish_dns_records                   = false
 approved_private_endpoint_target_keys = []
-
-# Standard-zone IDs are intentionally empty in prefixed mode. Terraform owns
-# the custom backing records, and enterprise DNS owns the exact bridge from the
-# standard privatelink target.
-existing_private_dns_zone_ids = {}
 
 private_endpoint_targets = {
   storage_dfs = {
     provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
     subresource_name     = "dfs"
-    private_dns_zone_key = "dfs"
+    dns_family          = "dfs"
     request_message      = "Consumer DFS private endpoint request"
   }
   storage_blob = {
     provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
     subresource_name     = "blob"
-    private_dns_zone_key = "blob"
+    dns_family          = "blob"
     request_message      = "Consumer Blob private endpoint request"
   }
   sql_server = {
     provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Sql/servers/sql-provider-example"
     subresource_name     = "sqlServer"
-    private_dns_zone_key = "sql"
+    dns_family          = "sql"
     request_message      = "Consumer SQL private endpoint request"
   }
 }
@@ -70,7 +63,7 @@ prefixed_private_dns_zones = {
   }
 }
 
-# Optional Azure DNS Private Resolver in an existing VNet and delegated subnet.
+# Optional Azure DNS Private Resolver for hybrid access to custom backing zones.
 deploy_dns_resolver               = false
 dns_resolver_name                 = "dnsr-consumer-eus-prd"
 dns_resolver_resource_group_name  = "rg-dns-consumer-eus-prd"
@@ -79,7 +72,6 @@ dns_resolver_inbound_subnet_name  = "snet-dns-inbound"
 dns_resolver_inbound_ip           = "10.10.0.4"
 dns_resolver_outbound_subnet_name = "snet-dns-outbound"
 
-# Azure outbound rules are only for enterprise-owned namespaces.
 enterprise_forwarding_rules = {
   corporate_internal = {
     domain_name = "corp.example."

@@ -15,6 +15,13 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-07-28 — reusable roots do not ship generated dependency locks
+The starter owns provider constraints in each root's `z_versions.tf` but excludes
+`.terraform.lock.hcl`. After copying one root, the consumer runs `terraform init`
+to generate and review a lockfile for that repository and execution platform. This
+supersedes the lockfile wording in the separate-roots decision below; the two
+architectures remain fully independent.
+
 ### 2026-07-28 — client-selectable Terraform architectures are separate roots
 The standard-context and prefixed-backing Private Link DNS designs are
 alternatives, not modes in one composition. Each lives in a self-contained

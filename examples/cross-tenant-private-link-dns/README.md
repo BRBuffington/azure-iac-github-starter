@@ -89,7 +89,7 @@ The template uses current Terraform MCP catalog examples and pins:
 
 The Private Endpoint AVM currently hardcodes automatic approval. Cross-tenant
 consumers normally require `is_manual_connection = true`, so
-Each child root contains its own `cross_tenant_private_endpoints.tf` direct
+each child root contains its own `cross_tenant_private_endpoints.tf` direct
 AzureRM exception based on the provider schema returned by Terraform MCP.
 
 ## Use

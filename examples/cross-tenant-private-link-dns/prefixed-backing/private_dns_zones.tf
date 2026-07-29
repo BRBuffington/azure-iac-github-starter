@@ -1,29 +1,8 @@
-# Custom backing zones are not part of Azure's standard Private Endpoint DNS
-# integration. Terraform owns these records, while enterprise DNS owns the
-# exact standard-name bridge and any health-aware selection policy.
-resource "terraform_data" "dns_publication_gate" {
-  count = var.publish_dns_records ? 1 : 0
-
-  lifecycle {
-    precondition {
-      condition = alltrue(flatten([
-        for zone in values(var.prefixed_private_dns_zones) : [
-          for record in values(zone.records) : contains(
-            var.approved_private_endpoint_target_keys,
-            record.private_endpoint_target_key
-          )
-        ]
-      ]))
-      error_message = "Verify every provider-side connection is Approved before publishing prefixed DNS records."
-    }
-  }
-}
-
 # Terraform MCP catalog source:
 # Azure/avm-res-network-privatednszone/azurerm, version 0.5.0.
 module "prefixed_private_dns_zone" {
   # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.5.0 release returned by Terraform MCP.
-  for_each = var.publish_dns_records ? var.prefixed_private_dns_zones : {}
+  for_each = local.prefixed_private_dns_zones_to_publish
 
   source  = "Azure/avm-res-network-privatednszone/azurerm"
   version = "0.5.0"
@@ -51,5 +30,5 @@ module "prefixed_private_dns_zone" {
     }
   }
 
-  depends_on = [terraform_data.dns_publication_gate]
+  depends_on = [terraform_data.configuration_guard]
 }

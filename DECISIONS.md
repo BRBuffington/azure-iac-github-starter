@@ -15,6 +15,13 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-07-28 — fixed starter composition belongs in readable locals
+The cross-tenant DNS roots accept only customer facts such as provider resource
+IDs, optional existing zone IDs, a DNS label and TTL, and resolver addresses.
+Endpoint, zone, record, approval, and forwarding maps are named locals consumed
+by `for_each`. Do not make adopters author nested `map(object(...))` schemas for
+the fixed DFS, Blob, and SQL composition shown by these starters.
+
 ### 2026-07-28 — reusable roots do not ship generated dependency locks
 The starter owns provider constraints in each root's `z_versions.tf` but excludes
 `.terraform.lock.hcl`. After copying one root, the consumer runs `terraform init`

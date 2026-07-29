@@ -2,7 +2,7 @@
 # Cross-tenant consumers normally lack approval rights on the provider resource,
 # so this focused raw AzureRM resource is required to create a pending request.
 resource "azurerm_private_endpoint" "cross_tenant" {
-  for_each = var.private_endpoint_targets
+  for_each = local.private_endpoint_targets_to_create
 
   name                = "pe-${var.name_prefix}-${replace(each.key, "_", "-")}"
   location            = var.location
@@ -21,4 +21,6 @@ resource "azurerm_private_endpoint" "cross_tenant" {
   lifecycle {
     ignore_changes = [tags["LastApplied"]]
   }
+
+  depends_on = [terraform_data.configuration_guard]
 }

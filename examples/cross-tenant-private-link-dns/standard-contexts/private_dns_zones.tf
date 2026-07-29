@@ -19,4 +19,6 @@ module "private_dns_zone" {
       private_dns_zone_supports_private_link = true
     }
   }
+
+  depends_on = [terraform_data.configuration_guard]
 }

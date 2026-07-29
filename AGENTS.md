@@ -24,6 +24,9 @@ and review rules below apply to every agent.
 - Keep plan and apply identities separate. Apply remains an explicit,
   human-approved GitHub Environment action.
 - Preserve provenance tags and the OPA state-safety and governance gates.
+- Keep starter inputs readable. Derive fixed resource-composition maps in
+  locals and make root resources iterate named locals, not nested object-map
+  variables.
 - Never run or recommend local `terraform apply`.
 - Stop on an unexpected destroy, replacement, state move, or scope expansion.
 

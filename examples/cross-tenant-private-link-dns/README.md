@@ -66,14 +66,14 @@ target the standard `privatelink` name. Do not use wildcard capture of
 
 Option B is deliberately two phase:
 
-1. Set `publish_dns_records = false` and apply the consumer-local Private
-  Endpoint requests without DNS records.
+1. Keep `approved_private_endpoint_target_keys` empty and apply the
+  consumer-local Private Endpoint requests without DNS records.
 2. The provider validates and approves each request.
 3. Verify `Approved` through Azure, add the approved target keys to
-    `approved_private_endpoint_target_keys`, and set
-    `publish_dns_records = true`.
-4. Apply the prefixed zones and records, then configure and validate the exact
-  enterprise DNS bridge.
+  `approved_private_endpoint_target_keys`.
+4. Apply the prefixed zones and records for those approved targets, then
+  configure and validate the exact enterprise DNS bridge. Previously published
+  targets remain in place while newly added targets wait for approval.
 
 The approval-key input is a pipeline gate, not independent proof. The delivery
 workflow must capture the live Azure connection state before the publication
@@ -111,6 +111,12 @@ The starter does not ship `.terraform.lock.hcl`. `terraform init` generates the
 consumer repository's dependency lockfile from the constraints in
 `z_versions.tf`; review that generated file under the consumer repository's
 normal dependency policy.
+
+Each child `terraform.tfvars.example` contains only deployment facts: Azure
+resource IDs, names, flags, a DNS label/TTL where applicable, and optional DNS
+server addresses. The fixed DFS, Blob, SQL, zone, record, and forwarding-rule
+maps live in `z_locals.tf`; root resources consume those named locals. Extend
+the locals when adapting the starter instead of adding nested object-map inputs.
 
 Do not apply this example locally. Integrate it into the governed pipeline in
 the repository root, using the backend and caller templates from

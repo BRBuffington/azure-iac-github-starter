@@ -43,168 +43,47 @@ variable "prefixed_dns_zone_resource_group_id" {
   description = "Existing resource group ID for prefixed Private DNS backing zones."
   default     = null
   nullable    = true
+}
+
+variable "provider_storage_account_id" {
+  type        = string
+  description = "Optional full resource ID of the provider Storage account. Creates both DFS and Blob Private Endpoints and backing records."
+  default     = null
+  nullable    = true
+}
+
+variable "provider_sql_server_id" {
+  type        = string
+  description = "Optional full resource ID of the provider Azure SQL logical server."
+  default     = null
+  nullable    = true
+}
+
+variable "prefixed_dns_label" {
+  type        = string
+  description = "Tenant, region, or context label prepended to each standard privatelink zone."
 
   validation {
-    condition     = !var.publish_dns_records || var.prefixed_dns_zone_resource_group_id != null
-    error_message = "prefixed_dns_zone_resource_group_id is required when DNS record publication is enabled."
+    condition     = can(regex("^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$", var.prefixed_dns_label))
+    error_message = "prefixed_dns_label must be one lowercase DNS label of 1-63 characters."
   }
 }
 
-variable "publish_dns_records" {
-  type        = bool
-  description = "Create prefixed backing zones and records after provider-side Private Endpoint approval has been verified."
-  default     = false
-}
-
-variable "private_endpoint_targets" {
-  type = map(object({
-    provider_resource_id = string
-    subresource_name     = string
-    dns_family           = string
-    request_message      = optional(string, "Cross-tenant private endpoint request")
-  }))
-  description = "Provider resource IDs, subresources, and matching DFS, Blob, or SQL DNS families."
+variable "private_dns_record_ttl" {
+  type        = number
+  description = "TTL in seconds for Terraform-owned prefixed backing records."
+  default     = 60
 
   validation {
-    condition     = length(var.private_endpoint_targets) > 0
-    error_message = "private_endpoint_targets must contain at least one consumer-side private endpoint."
-  }
-
-  validation {
-    condition = alltrue([
-      for target in values(var.private_endpoint_targets) :
-      contains(["dfs", "blob", "sqlServer"], target.subresource_name)
-    ])
-    error_message = "subresource_name must be dfs, blob, or sqlServer for this starter."
-  }
-
-  validation {
-    condition = alltrue([
-      for target in values(var.private_endpoint_targets) :
-      target.dns_family == {
-        dfs       = "dfs"
-        blob      = "blob"
-        sqlServer = "sql"
-      }[target.subresource_name]
-    ])
-    error_message = "dns_family must match the subresource: dfs=dfs, blob=blob, and sqlServer=sql."
-  }
-
-  validation {
-    condition = alltrue([
-      for target in values(var.private_endpoint_targets) :
-      can(regex(
-        target.subresource_name == "sqlServer" ?
-        "(?i)^/subscriptions/[0-9a-f-]{36}/resourceGroups/[^/]+/providers/Microsoft\\.Sql/servers/[^/]+$" :
-        "(?i)^/subscriptions/[0-9a-f-]{36}/resourceGroups/[^/]+/providers/Microsoft\\.Storage/storageAccounts/[^/]+$",
-        target.provider_resource_id
-      ))
-    ])
-    error_message = "provider_resource_id must be a full Storage account ID for dfs/blob or a full SQL logical-server ID for sqlServer."
-  }
-
-  validation {
-    condition = alltrue([
-      for target in values(var.private_endpoint_targets) :
-      target.subresource_name != "dfs" || anytrue([
-        for companion in values(var.private_endpoint_targets) :
-        companion.provider_resource_id == target.provider_resource_id && companion.subresource_name == "blob"
-      ])
-    ])
-    error_message = "Every ADLS Gen2 dfs target must include a blob target for the same Storage account."
-  }
-
-  validation {
-    condition = alltrue([
-      for target in values(var.private_endpoint_targets) : length(target.request_message) <= 128
-    ])
-    error_message = "request_message must be 128 characters or fewer so it is valid for Azure SQL and Storage."
-  }
-}
-
-variable "prefixed_private_dns_zones" {
-  type = map(object({
-    domain_name = string
-    records = map(object({
-      private_endpoint_target_key = string
-      ttl                         = optional(number, 60)
-    }))
-  }))
-  description = "Custom tenant- or region-prefixed backing zones and explicit A records."
-  default     = {}
-
-  validation {
-    condition     = !var.publish_dns_records || length(var.prefixed_private_dns_zones) > 0
-    error_message = "prefixed_private_dns_zones must be non-empty when DNS record publication is enabled."
-  }
-
-  validation {
-    condition = alltrue([
-      for zone in values(var.prefixed_private_dns_zones) : can(regex(
-        "(?i)^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*\\.privatelink\\.(?:(?:dfs|blob)\\.core\\.windows\\.net|database\\.windows\\.net)$",
-        zone.domain_name
-      ))
-    ])
-    error_message = "Each prefixed domain_name must add at least one label before a supported standard privatelink DFS, Blob, or SQL suffix."
-  }
-
-  validation {
-    condition = length(distinct([
-      for zone in values(var.prefixed_private_dns_zones) : lower(zone.domain_name)
-    ])) == length(var.prefixed_private_dns_zones)
-    error_message = "Each prefixed domain_name must be unique, ignoring case."
-  }
-
-  validation {
-    condition = alltrue(flatten([
-      for zone in values(var.prefixed_private_dns_zones) : [
-        for record_name, record in zone.records :
-        can(regex("^[a-z0-9][a-z0-9-]{0,62}$", record_name)) && record.ttl >= 30 && record.ttl <= 86400
-      ]
-    ]))
-    error_message = "Prefixed record names must be DNS labels and TTLs must be between 30 and 86400 seconds."
-  }
-
-  validation {
-    condition = alltrue(flatten([
-      for zone in values(var.prefixed_private_dns_zones) : [
-        for record in values(zone.records) : try(
-          endswith(lower(zone.domain_name), {
-            dfs  = ".privatelink.dfs.core.windows.net"
-            blob = ".privatelink.blob.core.windows.net"
-            sql  = ".privatelink.database.windows.net"
-          }[var.private_endpoint_targets[record.private_endpoint_target_key].dns_family]),
-          false
-        )
-      ]
-    ]))
-    error_message = "Every prefixed record must reference an existing endpoint target whose DFS, Blob, or SQL family matches the zone suffix."
+    condition     = var.private_dns_record_ttl >= 30 && var.private_dns_record_ttl <= 86400
+    error_message = "private_dns_record_ttl must be between 30 and 86400 seconds."
   }
 }
 
 variable "approved_private_endpoint_target_keys" {
   type        = set(string)
-  description = "Endpoint target keys independently verified as Approved before custom records are published."
+  description = "Endpoint target keys independently verified as Approved. Only these targets publish custom zones and records."
   default     = []
-
-  validation {
-    condition = alltrue([
-      for key in var.approved_private_endpoint_target_keys : contains(keys(var.private_endpoint_targets), key)
-    ])
-    error_message = "Every approved key must exist in private_endpoint_targets."
-  }
-
-  validation {
-    condition = !var.publish_dns_records || alltrue(flatten([
-      for zone in values(var.prefixed_private_dns_zones) : [
-        for record in values(zone.records) : contains(
-          var.approved_private_endpoint_target_keys,
-          record.private_endpoint_target_key
-        )
-      ]
-    ]))
-    error_message = "Every prefixed record target must be listed in approved_private_endpoint_target_keys before publication."
-  }
 }
 
 variable "deploy_dns_resolver" {
@@ -266,52 +145,47 @@ variable "dns_resolver_outbound_subnet_name" {
 
   validation {
     condition = (
-      length(var.enterprise_forwarding_rules) == 0 ||
+      length(var.enterprise_dns_server_ip_addresses) == 0 ||
       (var.deploy_dns_resolver && var.dns_resolver_outbound_subnet_name != null)
     )
-    error_message = "deploy_dns_resolver and dns_resolver_outbound_subnet_name are required when enterprise_forwarding_rules are supplied."
+    error_message = "deploy_dns_resolver and dns_resolver_outbound_subnet_name are required when enterprise DNS server IPs are supplied."
   }
 }
 
-variable "enterprise_forwarding_rules" {
-  type = map(object({
-    domain_name              = string
-    destination_ip_addresses = map(string)
-  }))
-  description = "Optional enterprise-owned namespaces forwarded from Azure to central DNS."
-  default     = {}
+variable "enterprise_forwarding_domain_name" {
+  type        = string
+  description = "Optional enterprise-owned DNS suffix forwarded from Azure, including the trailing period."
+  default     = null
+  nullable    = true
 
   validation {
-    condition = alltrue([
-      for rule in values(var.enterprise_forwarding_rules) : !anytrue([
-        for azure_zone in [
-          "privatelink.dfs.core.windows.net.",
-          "privatelink.blob.core.windows.net.",
-          "privatelink.database.windows.net.",
-          "dfs.core.windows.net.",
-          "blob.core.windows.net.",
-          "database.windows.net."
-        ] : endswith(lower(rule.domain_name), azure_zone)
-      ])
+    condition = var.enterprise_forwarding_domain_name == null || !anytrue([
+      for azure_zone in [
+        "privatelink.dfs.core.windows.net.",
+        "privatelink.blob.core.windows.net.",
+        "privatelink.database.windows.net.",
+        "dfs.core.windows.net.",
+        "blob.core.windows.net.",
+        "database.windows.net."
+      ] : endswith(lower(var.enterprise_forwarding_domain_name), azure_zone)
     ])
     error_message = "Resolver outbound rules are only for enterprise-owned namespaces. Azure service and privatelink zones remain consumer-local."
   }
 
   validation {
-    condition = alltrue([
-      for rule in values(var.enterprise_forwarding_rules) : endswith(rule.domain_name, ".")
-    ])
-    error_message = "Every forwarding-rule domain_name must be a fully qualified domain ending with a period."
+    condition     = var.enterprise_forwarding_domain_name == null || endswith(var.enterprise_forwarding_domain_name, ".")
+    error_message = "enterprise_forwarding_domain_name must be a fully qualified domain ending with a period."
   }
+}
+
+variable "enterprise_dns_server_ip_addresses" {
+  type        = set(string)
+  description = "Optional central DNS server IPv4 addresses for the enterprise forwarding domain. DNS port 53 is applied locally."
+  default     = []
 
   validation {
-    condition = alltrue(flatten([
-      for rule in values(var.enterprise_forwarding_rules) : [
-        for ip_address, port in rule.destination_ip_addresses :
-        can(cidrnetmask("${ip_address}/32")) && port == "53"
-      ]
-    ]))
-    error_message = "Every forwarding-rule destination must map a valid IPv4 address to DNS port 53."
+    condition     = alltrue([for ip_address in var.enterprise_dns_server_ip_addresses : can(cidrnetmask("${ip_address}/32"))])
+    error_message = "Every enterprise DNS server address must be a valid IPv4 address."
   }
 }
 

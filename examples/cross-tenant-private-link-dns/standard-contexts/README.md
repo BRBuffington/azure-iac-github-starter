@@ -24,16 +24,23 @@ same-authority Azure DNS Private Resolver inbound endpoints.
 ## Implementation sequence
 
 1. Replace every placeholder in `terraform.tfvars.example`.
-2. Include both `dfs` and `blob` targets for each ADLS Gen2 account and use
-  `sqlServer` for each Azure SQL logical server.
-3. Run a reviewed plan and create pending consumer-local Private Endpoint
+2. Set `provider_storage_account_id`, `provider_sql_server_id`, or both. The
+  Storage ID composes both required `dfs` and `blob` targets locally; the SQL
+  ID composes the `sqlServer` target.
+3. Leave each `existing_*_private_dns_zone_id` null to create that standard
+  zone, or set the exact existing zone ID when it is already linked to the
+  consumer VNet.
+4. Run a reviewed plan and create pending consumer-local Private Endpoint
   requests.
-4. The provider validates and approves each connection.
-5. Verify the zone group created the expected standard-zone A records.
-6. Configure each enterprise DNS client context to forward
+5. The provider validates and approves each connection.
+6. Verify the zone group created the expected standard-zone A records.
+7. Configure each enterprise DNS client context to forward
   `dfs.core.windows.net`, `blob.core.windows.net`, and
   `database.windows.net` to static, same-authority Resolver inbound endpoints.
-7. Canary one client population before broader rollout.
+8. Canary one client population before broader rollout.
+
+`z_locals.tf` owns the endpoint, standard-zone, and forwarding-rule maps. The
+tfvars file intentionally contains no nested resource schema.
 
 Never put resolver endpoints for different tenant authorities in one target
 list. NXDOMAIN is an authoritative answer, not a trigger to try another tenant.

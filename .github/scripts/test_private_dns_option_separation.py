@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pathlib
+import re
 import subprocess
 import unittest
 
@@ -10,6 +11,7 @@ STANDARD = PARENT / "standard-contexts"
 PREFIXED = PARENT / "prefixed-backing"
 REQUIRED_FILES = {
     "README.md",
+    "configuration_guard.tf",
     "cross_tenant_private_endpoints.tf",
     "dns_resolver.tf",
     "private_dns_zones.tf",
@@ -65,6 +67,19 @@ class PrivateDnsOptionSeparationTests(unittest.TestCase):
             with self.subTest(option=option.name):
                 lockfile = (option / ".terraform.lock.hcl").relative_to(REPO_ROOT)
                 self.assertNotIn(lockfile.as_posix(), tracked_files(option))
+
+    def test_composition_maps_are_readable_locals(self):
+        for option in (STANDARD, PREFIXED):
+            with self.subTest(option=option.name):
+                variables = (option / "z_variables.tf").read_text(encoding="utf-8")
+                self.assertNotIn("map(object(", variables)
+
+                for terraform_file in option.glob("*.tf"):
+                    for match in re.finditer(r"for_each\s*=\s*([^\r\n]+)", terraform_file.read_text(encoding="utf-8")):
+                        self.assertTrue(
+                            match.group(1).strip().startswith("local."),
+                            f"{terraform_file.name} must iterate a named local, not {match.group(1).strip()}",
+                        )
 
     def test_standard_option_has_no_prefixed_mode_inputs(self):
         text = authored_hcl(STANDARD)

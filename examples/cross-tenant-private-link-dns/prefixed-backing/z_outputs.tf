@@ -17,9 +17,9 @@ output "prefixed_private_dns_zone_ids" {
 }
 
 output "prefixed_private_dns_records" {
-  description = "Custom backing-record contract for configuring and validating the enterprise DNS standard-name bridge."
+  description = "Published custom backing-record contract for configuring and validating the enterprise DNS standard-name bridge."
   value = {
-    for zone_key, zone in var.prefixed_private_dns_zones : zone_key => {
+    for zone_key, zone in local.prefixed_private_dns_zones_to_publish : zone_key => {
       domain_name = zone.domain_name
       records = {
         for record_name, record in zone.records : record_name => {

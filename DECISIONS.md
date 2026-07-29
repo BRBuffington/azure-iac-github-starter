@@ -15,6 +15,15 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-07-28 — client-selectable Terraform architectures are separate roots
+The standard-context and prefixed-backing Private Link DNS designs are
+alternatives, not modes in one composition. Each lives in a self-contained
+Terraform root with its own provider contract, lockfile, inputs, tfvars,
+resources, outputs, README, tests, and state; the parent directory is a catalog
+only. Duplicate endpoint and resolver scaffolding intentionally so either root
+can be copied for another client without a selector, sibling dependency, or
+shared state. Do not recombine them behind an architecture flag.
+
 ### 2026-07-28 — validate config selectors before paths and queries
 The CD workflow rejects any config selector that is not a lowercase basename of
 letters, numbers, and hyphens, then verifies the corresponding tfvars file exists.

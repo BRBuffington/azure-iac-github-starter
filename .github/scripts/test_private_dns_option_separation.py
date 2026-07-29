@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pathlib
+import subprocess
 import unittest
 
 REPO_ROOT = pathlib.Path(__file__).resolve().parents[2]
@@ -8,7 +9,6 @@ PARENT = REPO_ROOT / "examples" / "cross-tenant-private-link-dns"
 STANDARD = PARENT / "standard-contexts"
 PREFIXED = PARENT / "prefixed-backing"
 REQUIRED_FILES = {
-    ".terraform.lock.hcl",
     "README.md",
     "cross_tenant_private_endpoints.tf",
     "dns_resolver.tf",
@@ -20,6 +20,17 @@ REQUIRED_FILES = {
     "z_variables.tf",
     "z_versions.tf",
 }
+
+
+def tracked_files(root: pathlib.Path) -> set[str]:
+    pathspec = root.relative_to(REPO_ROOT).as_posix()
+    result = subprocess.run(
+        ["git", "-C", str(REPO_ROOT), "ls-files", "--", pathspec],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return set(result.stdout.splitlines())
 
 
 def relative_files(root: pathlib.Path) -> set[str]:
@@ -46,6 +57,14 @@ class PrivateDnsOptionSeparationTests(unittest.TestCase):
             with self.subTest(option=option.name):
                 self.assertTrue(REQUIRED_FILES.issubset(relative_files(option)))
                 self.assertNotIn("../", authored_hcl(option))
+
+    def test_dependency_lockfiles_are_consumer_generated(self):
+        gitignore = (REPO_ROOT / ".gitignore").read_text(encoding="utf-8").splitlines()
+        self.assertIn(".terraform.lock.hcl", gitignore)
+        for option in (STANDARD, PREFIXED):
+            with self.subTest(option=option.name):
+                lockfile = (option / ".terraform.lock.hcl").relative_to(REPO_ROOT)
+                self.assertNotIn(lockfile.as_posix(), tracked_files(option))
 
     def test_standard_option_has_no_prefixed_mode_inputs(self):
         text = authored_hcl(STANDARD)

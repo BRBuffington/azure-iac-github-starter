@@ -107,6 +107,11 @@ terraform plan -input=false -out=tfplan
 terraform show -json tfplan > tfplan.json
 ```
 
+The starter does not ship `.terraform.lock.hcl`. `terraform init` generates the
+consumer repository's dependency lockfile from the constraints in
+`z_versions.tf`; review that generated file under the consumer repository's
+normal dependency policy.
+
 Do not apply this example locally. Integrate it into the governed pipeline in
 the repository root, using the backend and caller templates from
 [terraform-pipelines-github](https://github.com/BRBuffington/terraform-pipelines-github/tree/main/templates).

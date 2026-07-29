@@ -6,29 +6,16 @@ private_endpoint_subnet_id           = "/subscriptions/00000000-0000-0000-0000-0
 consumer_virtual_network_id          = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-consumer-eus-prd/providers/Microsoft.Network/virtualNetworks/vnet-consumer-eus-prd"
 private_dns_zone_resource_group_id   = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns-consumer-eus-prd"
 
-# Set one or more keys when the consumer already owns and links these zones.
-existing_private_dns_zone_ids = {}
+# Set either provider ID or both. A Storage account automatically composes the
+# required DFS and Blob endpoints; Azure SQL composes the sqlServer endpoint.
+provider_storage_account_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
+provider_sql_server_id      = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Sql/servers/sql-provider-example"
 
-private_endpoint_targets = {
-  storage_dfs = {
-    provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
-    subresource_name     = "dfs"
-    private_dns_zone_key = "dfs"
-    request_message      = "Consumer DFS private endpoint request"
-  }
-  storage_blob = {
-    provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
-    subresource_name     = "blob"
-    private_dns_zone_key = "blob"
-    request_message      = "Consumer Blob private endpoint request"
-  }
-  sql_server = {
-    provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Sql/servers/sql-provider-example"
-    subresource_name     = "sqlServer"
-    private_dns_zone_key = "sql"
-    request_message      = "Consumer SQL private endpoint request"
-  }
-}
+# Leave null to create the standard zones. Set an ID only when the consumer
+# already owns and links that exact zone to consumer_virtual_network_id.
+existing_dfs_private_dns_zone_id  = null
+existing_blob_private_dns_zone_id = null
+existing_sql_private_dns_zone_id  = null
 
 # Optional Azure DNS Private Resolver in an existing VNet and delegated subnet.
 deploy_dns_resolver               = false
@@ -39,17 +26,10 @@ dns_resolver_inbound_subnet_name  = "snet-dns-inbound"
 dns_resolver_inbound_ip           = "10.10.0.4"
 dns_resolver_outbound_subnet_name = "snet-dns-outbound"
 
-# Azure outbound rules are for enterprise-owned namespaces only. Central DNS
-# forwards the public service zones to this resolver in the opposite direction.
-enterprise_forwarding_rules = {
-  corporate_internal = {
-    domain_name = "corp.example."
-    destination_ip_addresses = {
-      "10.20.0.10" = "53"
-      "10.20.0.11" = "53"
-    }
-  }
-}
+# Optional outbound forwarding for one enterprise-owned namespace. Central DNS
+# forwards Azure public service zones to the resolver in the opposite direction.
+enterprise_forwarding_domain_name   = "corp.example."
+enterprise_dns_server_ip_addresses = ["10.20.0.10", "10.20.0.11"]
 
 tags = {
   Environment = "prd"

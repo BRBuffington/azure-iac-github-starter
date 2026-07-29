@@ -1,6 +1,6 @@
 ---
-description: Path-scoped rules for Azure Terraform modules, configs, and backends.
-applyTo: "infra/**/*.{tf,tfvars}"
+description: Path-scoped rules for Azure Terraform modules, examples, configs, and backends.
+applyTo: "**/*.{tf,tfvars}"
 ---
 
 # Azure Terraform implementation rules
@@ -11,6 +11,10 @@ applyTo: "infra/**/*.{tf,tfvars}"
   module version and document why a direct `azurerm_*` resource is necessary.
 - Follow the repository's existing variable, local, output, and config shape.
   Do not introduce a second naming system or environment-selection mechanism.
+- Keep starter inputs readable: expose resource IDs, names, flags, and small
+  scalar collections. Build every map consumed by `for_each` as a named local.
+  Do not expose a nested `map(object(...))` solely to describe a fixed starter
+  composition that Terraform can derive.
 - Keep resource names deterministic from `scope`, `region_alias`, and
   `environment`; do not depend on runtime timestamps or random values unless the
   service requires global uniqueness.

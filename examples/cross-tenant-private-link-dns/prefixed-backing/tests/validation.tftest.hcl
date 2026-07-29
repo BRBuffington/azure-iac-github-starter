@@ -9,13 +9,8 @@ variables {
   private_endpoint_subnet_id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-consumer-eus-prd/providers/Microsoft.Network/virtualNetworks/vnet-consumer-eus-prd/subnets/snet-private-endpoints"
   consumer_virtual_network_id          = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-consumer-eus-prd/providers/Microsoft.Network/virtualNetworks/vnet-consumer-eus-prd"
   prefixed_dns_zone_resource_group_id  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns-consumer-eus-prd"
-  private_endpoint_targets = {
-    sql_server = {
-      provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Sql/servers/sql-provider-example"
-      subresource_name     = "sqlServer"
-      dns_family           = "sql"
-    }
-  }
+  provider_sql_server_id               = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Sql/servers/sql-provider-example"
+  prefixed_dns_label                   = "tenant-a"
 }
 
 run "valid_request_phase_without_dns_publication" {
@@ -45,40 +40,9 @@ run "valid_approved_record_publication" {
   command = plan
 
   variables {
-    publish_dns_records = true
-    private_endpoint_targets = {
-      storage_dfs = {
-        provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
-        subresource_name     = "dfs"
-        dns_family           = "dfs"
-      }
-      storage_blob = {
-        provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
-        subresource_name     = "blob"
-        dns_family           = "blob"
-      }
-    }
+    provider_storage_account_id           = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
+    provider_sql_server_id                = null
     approved_private_endpoint_target_keys = ["storage_dfs", "storage_blob"]
-    prefixed_private_dns_zones = {
-      tenant_a_dfs = {
-        domain_name = "tenant-a.privatelink.dfs.core.windows.net"
-        records = {
-          stproviderexample = {
-            private_endpoint_target_key = "storage_dfs"
-            ttl                         = 60
-          }
-        }
-      }
-      tenant_a_blob = {
-        domain_name = "tenant-a.privatelink.blob.core.windows.net"
-        records = {
-          stproviderexample = {
-            private_endpoint_target_key = "storage_blob"
-            ttl                         = 60
-          }
-        }
-      }
-    }
   }
 
   assert {
@@ -96,18 +60,12 @@ run "valid_resolver_with_forwarding" {
   command = plan
 
   variables {
-    deploy_dns_resolver               = true
-    dns_resolver_inbound_subnet_name  = "snet-dns-inbound"
-    dns_resolver_inbound_ip           = "10.10.0.4"
-    dns_resolver_outbound_subnet_name = "snet-dns-outbound"
-    enterprise_forwarding_rules = {
-      corporate_internal = {
-        domain_name = "corp.example."
-        destination_ip_addresses = {
-          "10.20.0.10" = "53"
-        }
-      }
-    }
+    deploy_dns_resolver                = true
+    dns_resolver_inbound_subnet_name   = "snet-dns-inbound"
+    dns_resolver_inbound_ip            = "10.10.0.4"
+    dns_resolver_outbound_subnet_name  = "snet-dns-outbound"
+    enterprise_forwarding_domain_name  = "corp.example."
+    enterprise_dns_server_ip_addresses = ["10.20.0.10"]
   }
 
   assert {
@@ -116,141 +74,124 @@ run "valid_resolver_with_forwarding" {
   }
 }
 
-run "reject_publication_without_zones" {
+run "reject_missing_provider_resource" {
   command = plan
 
   variables {
-    publish_dns_records                   = true
-    approved_private_endpoint_target_keys = ["sql_server"]
+    provider_storage_account_id = null
+    provider_sql_server_id      = null
   }
 
-  expect_failures = [var.prefixed_private_dns_zones]
+  expect_failures = [terraform_data.configuration_guard]
+}
+
+run "reject_invalid_provider_resource_id" {
+  command = plan
+
+  variables {
+    provider_sql_server_id = "/subscriptions/not-a-guid/resourceGroups/rg-provider-data/providers/Microsoft.Sql/servers/sql-provider-example"
+  }
+
+  expect_failures = [terraform_data.configuration_guard]
+}
+
+run "reject_unknown_approval_key" {
+  command = plan
+
+  variables {
+    approved_private_endpoint_target_keys = ["storage_blob"]
+  }
+
+  expect_failures = [terraform_data.configuration_guard]
 }
 
 run "reject_unapproved_record" {
   command = plan
 
-  variables {
-    publish_dns_records = true
-    prefixed_private_dns_zones = {
-      tenant_a_sql = {
-        domain_name = "tenant-a.privatelink.database.windows.net"
-        records = {
-          sqlproviderexample = {
-            private_endpoint_target_key = "sql_server"
-          }
-        }
-      }
-    }
+  assert {
+    condition     = length(module.prefixed_private_dns_zone) == 0
+    error_message = "Unapproved endpoint targets must not publish backing zones or records."
   }
-
-  expect_failures = [var.approved_private_endpoint_target_keys]
 }
 
-run "reject_zone_service_mismatch" {
+run "valid_local_zone_family_mapping" {
+  command = plan
+
+  assert {
+    condition     = local.prefixed_private_dns_zones["tenant_a_sql"].domain_name == "tenant-a.privatelink.database.windows.net"
+    error_message = "The local SQL target must map to the prefixed SQL Private Link suffix."
+  }
+}
+
+run "reject_invalid_prefixed_dns_label" {
   command = plan
 
   variables {
-    publish_dns_records                   = true
+    prefixed_dns_label = "Tenant A"
+  }
+
+  expect_failures = [var.prefixed_dns_label]
+}
+
+run "valid_storage_composition" {
+  command = plan
+
+  variables {
+    provider_storage_account_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
+    provider_sql_server_id      = null
+  }
+
+  assert {
+    condition     = length(local.private_endpoint_targets) == 2 && length(local.prefixed_private_dns_zones) == 2
+    error_message = "A Storage account ID must compose DFS and Blob endpoints plus matching backing zones."
+  }
+}
+
+run "valid_incremental_publication" {
+  command = plan
+
+  variables {
+    provider_storage_account_id           = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
     approved_private_endpoint_target_keys = ["sql_server"]
-    prefixed_private_dns_zones = {
-      tenant_a_blob = {
-        domain_name = "tenant-a.privatelink.blob.core.windows.net"
-        records = {
-          sqlproviderexample = {
-            private_endpoint_target_key = "sql_server"
-          }
-        }
-      }
-    }
   }
 
-  expect_failures = [var.prefixed_private_dns_zones]
-}
-
-run "reject_duplicate_zone_names" {
-  command = plan
-
-  variables {
-    publish_dns_records                   = true
-    approved_private_endpoint_target_keys = ["sql_server"]
-    prefixed_private_dns_zones = {
-      tenant_a_sql = {
-        domain_name = "tenant-a.privatelink.database.windows.net"
-        records = {
-          sqlproviderexample = {
-            private_endpoint_target_key = "sql_server"
-          }
-        }
-      }
-      duplicate_tenant_a_sql = {
-        domain_name = "TENANT-A.PRIVATELINK.DATABASE.WINDOWS.NET"
-        records = {
-          sqlproviderexample = {
-            private_endpoint_target_key = "sql_server"
-          }
-        }
-      }
-    }
+  assert {
+    condition     = length(azurerm_private_endpoint.cross_tenant) == 3
+    error_message = "Adding Storage must create pending DFS and Blob endpoints alongside the existing SQL endpoint."
   }
 
-  expect_failures = [var.prefixed_private_dns_zones]
-}
-
-run "reject_dfs_without_blob" {
-  command = plan
-
-  variables {
-    private_endpoint_targets = {
-      storage_dfs = {
-        provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
-        subresource_name     = "dfs"
-        dns_family           = "dfs"
-      }
-    }
+  assert {
+    condition     = length(module.prefixed_private_dns_zone) == 1 && contains(keys(module.prefixed_private_dns_zone), "tenant_a_sql")
+    error_message = "Incremental expansion must retain the approved SQL zone while unapproved Storage zones remain unpublished."
   }
 
-  expect_failures = [var.private_endpoint_targets]
+  assert {
+    condition     = toset(keys(output.prefixed_private_dns_records)) == toset(["tenant_a_sql"])
+    error_message = "The enterprise-DNS bridge output must expose only published, approved targets."
+  }
 }
 
 run "reject_missing_zone_resource_group_on_publication" {
   command = plan
 
   variables {
-    publish_dns_records                   = true
     prefixed_dns_zone_resource_group_id   = null
     approved_private_endpoint_target_keys = ["sql_server"]
-    prefixed_private_dns_zones = {
-      tenant_a_sql = {
-        domain_name = "tenant-a.privatelink.database.windows.net"
-        records = {
-          sqlproviderexample = {
-            private_endpoint_target_key = "sql_server"
-          }
-        }
-      }
-    }
   }
 
-  expect_failures = [var.prefixed_dns_zone_resource_group_id]
+  expect_failures = [terraform_data.configuration_guard]
 }
 
 run "reject_azure_service_forwarding" {
   command = plan
 
   variables {
-    deploy_dns_resolver               = true
-    dns_resolver_inbound_subnet_name  = "snet-dns-inbound"
-    dns_resolver_outbound_subnet_name = "snet-dns-outbound"
-    enterprise_forwarding_rules = {
-      unsafe_service_zone = {
-        domain_name = "account.blob.core.windows.net."
-        destination_ip_addresses = {
-          "10.20.0.10" = "53"
-        }
-      }
-    }
+    deploy_dns_resolver                = true
+    dns_resolver_inbound_subnet_name   = "snet-dns-inbound"
+    dns_resolver_outbound_subnet_name  = "snet-dns-outbound"
+    enterprise_forwarding_domain_name  = "account.blob.core.windows.net."
+    enterprise_dns_server_ip_addresses = ["10.20.0.10"]
   }
 
-  expect_failures = [var.enterprise_forwarding_rules]
+  expect_failures = [var.enterprise_forwarding_domain_name]
 }

@@ -6,62 +6,19 @@ private_endpoint_subnet_id           = "/subscriptions/00000000-0000-0000-0000-0
 consumer_virtual_network_id          = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-consumer-eus-prd/providers/Microsoft.Network/virtualNetworks/vnet-consumer-eus-prd"
 prefixed_dns_zone_resource_group_id  = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns-consumer-eus-prd"
 
-# Phase 1: keep false to create only pending Private Endpoint requests.
-# Phase 2: after Azure reports every listed connection Approved, set true and
-# populate approved_private_endpoint_target_keys with those verified keys.
-publish_dns_records                   = false
+# Phase 1: keep this empty to create only pending Private Endpoint requests.
+# Phase 2: after Azure reports a connection Approved, add its key. Terraform
+# publishes only approved targets, so existing records remain during expansion.
 approved_private_endpoint_target_keys = []
 
-private_endpoint_targets = {
-  storage_dfs = {
-    provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
-    subresource_name     = "dfs"
-    dns_family          = "dfs"
-    request_message      = "Consumer DFS private endpoint request"
-  }
-  storage_blob = {
-    provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
-    subresource_name     = "blob"
-    dns_family          = "blob"
-    request_message      = "Consumer Blob private endpoint request"
-  }
-  sql_server = {
-    provider_resource_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Sql/servers/sql-provider-example"
-    subresource_name     = "sqlServer"
-    dns_family          = "sql"
-    request_message      = "Consumer SQL private endpoint request"
-  }
-}
+# Set either provider ID or both. Storage automatically composes DFS and Blob
+# endpoints/zones; Azure SQL composes the sqlServer endpoint/zone.
+provider_storage_account_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Storage/storageAccounts/stproviderexample"
+provider_sql_server_id      = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-provider-data/providers/Microsoft.Sql/servers/sql-provider-example"
 
-prefixed_private_dns_zones = {
-  tenant_a_dfs = {
-    domain_name = "tenant-a.privatelink.dfs.core.windows.net"
-    records = {
-      stproviderexample = {
-        private_endpoint_target_key = "storage_dfs"
-        ttl                         = 60
-      }
-    }
-  }
-  tenant_a_blob = {
-    domain_name = "tenant-a.privatelink.blob.core.windows.net"
-    records = {
-      stproviderexample = {
-        private_endpoint_target_key = "storage_blob"
-        ttl                         = 60
-      }
-    }
-  }
-  tenant_a_sql = {
-    domain_name = "tenant-a.privatelink.database.windows.net"
-    records = {
-      sql-provider-example = {
-        private_endpoint_target_key = "sql_server"
-        ttl                         = 60
-      }
-    }
-  }
-}
+# Terraform derives all prefixed zone names and A records from these values.
+prefixed_dns_label      = "tenant-a"
+private_dns_record_ttl = 60
 
 # Optional Azure DNS Private Resolver for hybrid access to custom backing zones.
 deploy_dns_resolver               = false
@@ -72,15 +29,8 @@ dns_resolver_inbound_subnet_name  = "snet-dns-inbound"
 dns_resolver_inbound_ip           = "10.10.0.4"
 dns_resolver_outbound_subnet_name = "snet-dns-outbound"
 
-enterprise_forwarding_rules = {
-  corporate_internal = {
-    domain_name = "corp.example."
-    destination_ip_addresses = {
-      "10.20.0.10" = "53"
-      "10.20.0.11" = "53"
-    }
-  }
-}
+enterprise_forwarding_domain_name   = "corp.example."
+enterprise_dns_server_ip_addresses = ["10.20.0.10", "10.20.0.11"]
 
 tags = {
   Environment = "prd"

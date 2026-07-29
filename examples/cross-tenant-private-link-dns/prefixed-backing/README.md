@@ -23,15 +23,21 @@ Enterprise DNS separately owns the exact bridge from each standard
 
 ## Two-phase deployment
 
-1. Set `publish_dns_records = false` and apply only the pending Private Endpoint
-   requests through the protected pipeline.
+1. Set the provider Storage and/or SQL resource IDs, choose
+   `prefixed_dns_label`, keep `approved_private_endpoint_target_keys` empty,
+   and apply only the pending Private Endpoint requests through the protected
+   pipeline.
 2. The provider validates and approves every connection.
 3. Query Azure for live `Approved` state and retain the evidence.
-4. Populate `approved_private_endpoint_target_keys`, set
-   `publish_dns_records = true`, and apply the backing zones and records.
+4. Add each verified key to `approved_private_endpoint_target_keys` and apply
+   its backing zone and record. Already-approved records remain in place while
+   newly added endpoints wait for approval.
 5. Configure and test the exact standard-name bridge in enterprise DNS.
 
 The approved-key set is a pipeline gate, not independent proof of approval.
+`z_locals.tf` derives the DFS, Blob, and SQL endpoint targets, prefixed zones,
+record names, and TTL-bearing A-record maps from those simple inputs. The
+tfvars file intentionally contains no nested resource schema.
 
 ## Enterprise DNS bridge and health policy
 

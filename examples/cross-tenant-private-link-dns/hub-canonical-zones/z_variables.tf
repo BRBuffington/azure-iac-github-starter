@@ -134,6 +134,28 @@ variable "canonical_zone_keys" {
   }
 }
 
+variable "cross_tenant_tenant_id" {
+  type        = string
+  description = <<-EOT
+    Optional Microsoft Entra tenant GUID to authenticate the cross_tenant provider
+    alias, which creates the spoke zone links. Leave null when one identity already
+    holds write permission on the private DNS zone and on every spoke virtual
+    network across both tenants; the alias then behaves exactly like the default
+    provider. Set it to pin link creation to a multi-tenant service principal or a
+    B2B guest that spans the tenants.
+  EOT
+  default     = null
+  nullable    = true
+
+  validation {
+    condition = var.cross_tenant_tenant_id == null || can(regex(
+      "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+      var.cross_tenant_tenant_id
+    ))
+    error_message = "cross_tenant_tenant_id must be a Microsoft Entra tenant GUID when supplied."
+  }
+}
+
 variable "deploy_dns_resolver" {
   type        = bool
   description = "Deploy the shared Azure DNS Private Resolver in the hub virtual network."

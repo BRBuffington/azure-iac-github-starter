@@ -5,7 +5,15 @@ output "private_dns_zone_ids" {
 
 output "linked_virtual_network_ids" {
   description = "Virtual networks holding a resolution-only link to every canonical zone, keyed by link label."
-  value       = { for key, link in local.virtual_network_links : key => link.virtual_network_id }
+  value       = local.linked_virtual_network_ids
+}
+
+output "zone_virtual_network_link_ids" {
+  description = "Every created zone link, keyed by hub-<zone> or <zone>-<spoke>."
+  value = merge(
+    { for key, link in azurerm_private_dns_zone_virtual_network_link.hub : "hub-${key}" => link.id },
+    { for key, link in azurerm_private_dns_zone_virtual_network_link.spoke : key => link.id },
+  )
 }
 
 output "published_record_fqdns" {

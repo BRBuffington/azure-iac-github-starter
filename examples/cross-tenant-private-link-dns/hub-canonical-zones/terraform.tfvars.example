@@ -19,6 +19,10 @@ spoke_virtual_networks = {
   }
 }
 
+# Optional. Leave unset when one identity already spans both tenants. Set it to
+# pin spoke link creation to a multi-tenant service principal or a B2B guest.
+# cross_tenant_tenant_id = "22222222-2222-2222-2222-222222222222"
+
 # Private Endpoints owned outside this hub do not register themselves here. List
 # each one so the canonical name resolves privately. Read record_name and
 # private_ip_address from the endpoint's NIC in the owning subscription.

@@ -132,6 +132,7 @@ jobs:
           - standard-contexts
           - prefixed-backing
           - hub-canonical-zones
+          - hub-canonical-zones/sample-networks
     defaults:
       run:
         shell: bash

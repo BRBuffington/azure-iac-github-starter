@@ -1,6 +1,11 @@
 mock_provider "azapi" {}
 mock_provider "azurerm" {}
 
+# The cross_tenant alias creates the spoke links, so it needs its own mock.
+mock_provider "azurerm" {
+  alias = "cross_tenant"
+}
+
 variables {
   subscription_id                    = "00000000-0000-0000-0000-000000000000"
   location                           = "eastus"
@@ -36,16 +41,34 @@ run "cross_tenant_spoke_is_linked_for_resolution_only" {
     }
   }
 
+  # One link per zone per spoke, plus one hub link per zone.
   assert {
-    condition     = length(local.virtual_network_links) == 2
-    error_message = "The hub link plus each spoke link must be planned."
+    condition     = length(local.spoke_zone_links) == 2
+    error_message = "Each canonical zone must receive its own link to each spoke network."
+  }
+
+  assert {
+    condition     = length(azurerm_private_dns_zone_virtual_network_link.hub) == 2
+    error_message = "The hub must be linked to every canonical zone it hosts."
   }
 
   assert {
     condition = alltrue([
-      for link in values(local.virtual_network_links) : link.registration_enabled == false
+      for link in values(azurerm_private_dns_zone_virtual_network_link.spoke) : link.registration_enabled == false
     ])
     error_message = "Private Link zones must never absorb spoke registrations; every link is resolution-only."
+  }
+
+  assert {
+    condition = alltrue([
+      for link in values(azurerm_private_dns_zone_virtual_network_link.hub) : link.registration_enabled == false
+    ])
+    error_message = "The hub link is resolution-only as well."
+  }
+
+  assert {
+    condition     = local.private_dns_zone_resource_group_name == "rg-dns-hub-eus-prd"
+    error_message = "Explicit links address the zone by resource group name parsed from the supplied ID."
   }
 }
 

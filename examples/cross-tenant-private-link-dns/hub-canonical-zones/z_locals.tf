@@ -13,29 +13,26 @@ locals {
     if contains(var.canonical_zone_keys, key)
   }
 
-  # Every link is resolution-only. Autoregistration would register spoke VM records
-  # into a Private Link zone, which is never the intent for this zone class.
-  hub_virtual_network_link = {
-    hub = {
-      name                                   = "link-${var.name_prefix}-hub"
-      virtual_network_id                     = var.hub_virtual_network_id
-      registration_enabled                   = false
-      private_dns_zone_supports_private_link = true
+  # The zone's resource group name, parsed from the supplied resource group ID.
+  # Explicit link resources address the zone by name, not by ID.
+  private_dns_zone_resource_group_name = element(split("/", var.private_dns_zone_resource_group_id), 4)
+
+  # One link per zone per spoke network. Flattened so each link is a discrete
+  # resource instance rather than a nested module argument.
+  spoke_zone_links = {
+    for pair in setproduct(keys(local.private_dns_zones_to_create), keys(var.spoke_virtual_networks)) :
+    "${pair[0]}-${pair[1]}" => {
+      zone_key           = pair[0]
+      spoke_key          = pair[1]
+      domain_name        = local.private_dns_zones_to_create[pair[0]]
+      virtual_network_id = var.spoke_virtual_networks[pair[1]].virtual_network_id
     }
   }
 
-  spoke_virtual_network_links = {
-    for key, spoke in var.spoke_virtual_networks : key => {
-      name                                   = "link-${var.name_prefix}-${key}"
-      virtual_network_id                     = spoke.virtual_network_id
-      registration_enabled                   = false
-      private_dns_zone_supports_private_link = true
-    }
-  }
-
-  virtual_network_links = merge(
-    local.hub_virtual_network_link,
-    local.spoke_virtual_network_links,
+  # Every linked network, for the output and for reasoning about blast radius.
+  linked_virtual_network_ids = merge(
+    { hub = var.hub_virtual_network_id },
+    { for key, spoke in var.spoke_virtual_networks : key => spoke.virtual_network_id },
   )
 
   # Records are grouped per zone so each zone module owns only its own record set.

@@ -52,6 +52,39 @@ forwarders are only safe when every target serves the same complete namespace.
 | `spoke_virtual_networks` | Networks that resolve the canonical zones, including other tenants. |
 | `published_endpoint_records` | Records for endpoints the hub does not own. A link resolves; it does not register. |
 | `canonical_zone_keys` | Which canonical suffixes this hub is authoritative for. |
+| `cross_tenant_tenant_id` | Optional. Pins spoke link creation to an identity that spans both tenants. |
+
+## Where the links are created, and the credential seam
+
+Zone links are explicit `azurerm_private_dns_zone_virtual_network_link`
+resources in `zone_virtual_network_links.tf`, not a nested module argument, so
+each one is its own plan entry and the credential boundary is visible. You get
+one link per zone per network: two canonical zones and one spoke means two hub
+links and two spoke links.
+
+A `virtualNetworkLinks` resource is a **child of the private DNS zone**, so it is
+always created in the hub subscription regardless of which tenant owns the linked
+network. The spoke tenant cannot create it alone. What varies is the credential:
+Azure requires write permission on the zone **and** on the virtual network, in
+both tenants.
+
+The `azurerm.cross_tenant` provider alias exists for exactly that. Leave
+`cross_tenant_tenant_id` null and it authenticates like the default provider,
+which is correct when one identity already spans both tenants. Set it to pin link
+creation to a multi-tenant service principal or a B2B guest.
+
+If governance forbids any single identity holding rights in both tenants, this
+root cannot create the spoke link at all. That is an Azure constraint, not a
+Terraform one, and it is worth confirming before committing to this option.
+
+## Trying it without a landing zone
+
+[`sample-networks/`](sample-networks/) is a disposable scaffold that creates a hub
+virtual network with a properly delegated resolver inbound subnet, a spoke
+virtual network, and the resource groups this root expects. It emits a
+paste-ready tfvars fragment. It is a lab, not part of this option's contract:
+this root consumes existing networks on purpose, because a real deployment
+attaches to a customer landing zone rather than creating one.
 
 ## Deliberate omissions
 

@@ -1,0 +1,44 @@
+subscription_id                    = "00000000-0000-0000-0000-000000000000"
+location                           = "centralus"
+name_prefix                        = "contoso-hub"
+private_dns_zone_resource_group_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-hub-dns"
+hub_virtual_network_id             = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-hub-network/providers/Microsoft.Network/virtualNetworks/vnet-hub"
+
+canonical_zone_keys = ["dfs", "blob"]
+
+# Spoke networks that must resolve the canonical zones. An entry whose virtual
+# network lives in another Microsoft Entra tenant is supported; the deploying
+# identity needs write permission on the zone and on that virtual network, in
+# both tenants.
+spoke_virtual_networks = {
+  hub-workloads = {
+    virtual_network_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-hub-network/providers/Microsoft.Network/virtualNetworks/vnet-hub-workloads"
+  }
+  partner-tenant = {
+    virtual_network_id = "/subscriptions/11111111-1111-1111-1111-111111111111/resourceGroups/rg-partner-network/providers/Microsoft.Network/virtualNetworks/vnet-partner"
+  }
+}
+
+# Private Endpoints owned outside this hub do not register themselves here. List
+# each one so the canonical name resolves privately. Read record_name and
+# private_ip_address from the endpoint's NIC in the owning subscription.
+published_endpoint_records = {
+  partner-storage-dfs = {
+    zone_key           = "dfs"
+    record_name        = "examplestorageaccount"
+    private_ip_address = "10.216.80.9"
+  }
+  partner-storage-blob = {
+    zone_key           = "blob"
+    record_name        = "examplestorageaccount"
+    private_ip_address = "10.216.80.8"
+  }
+}
+
+deploy_dns_resolver              = true
+dns_resolver_resource_group_name = "rg-hub-network"
+dns_resolver_inbound_subnet_name = "snet-dnsr-inbound"
+
+tags = {
+  workload = "shared-dns"
+}

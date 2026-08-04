@@ -131,6 +131,7 @@ jobs:
         option:
           - standard-contexts
           - prefixed-backing
+          - hub-canonical-zones
     defaults:
       run:
         shell: bash

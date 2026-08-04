@@ -1,0 +1,10 @@
+subscription_id = "00000000-0000-0000-0000-000000000000"
+location        = "centralus"
+name_prefix     = "dnslab"
+
+hub_address_space   = "10.90.0.0/22"
+spoke_address_space = "10.91.0.0/22"
+
+tags = {
+  purpose = "private-link-dns-lab"
+}

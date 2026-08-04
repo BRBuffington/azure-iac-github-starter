@@ -15,7 +15,8 @@ module "private_dns_zone" {
   parent_id   = var.private_dns_zone_resource_group_id
   tags        = local.avm_tags
 
-  virtual_network_links = local.virtual_network_links
+  # Links are declared explicitly in zone_virtual_network_links.tf so the
+  # cross-tenant credential seam is visible and each link is its own plan entry.
 
   # A virtual network link grants resolution, never registration. Private Endpoints
   # owned outside this hub do not self-register here, so their canonical A records

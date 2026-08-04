@@ -16,7 +16,7 @@ deployable Terraform and no architecture selector.
 - Create consumer-local Private Endpoints by full provider resource ID. The
   provider independently approves each pending connection.
 - Choose exactly one child implementation and one DNS record owner per
-  deployment. Do not compose the two roots together.
+  deployment. Do not compose the roots together.
 - ADLS Gen2 requires both `dfs` and `blob` endpoints and zones.
 - Applications keep using normal service FQDNs. Azure SQL clients use
   `<server>.database.windows.net`, never a raw private IP or the
@@ -79,6 +79,42 @@ The approval-key input is a pipeline gate, not independent proof. The delivery
 workflow must capture the live Azure connection state before the publication
 phase.
 
+### Option C: [`hub-canonical-zones/`](hub-canonical-zones/)
+
+Use this standalone root when several networks, including networks in other
+Microsoft Entra tenants, must share one enterprise DNS source of truth. One
+elected hub hosts a single canonical `privatelink.*` zone per suffix. Every other
+network receives a resolution-only virtual network link to that same zone, so
+there is one authority rather than one per tenant.
+
+Query flow:
+
+```text
+client -> normal Azure service FQDN -> public CNAME -> standard privatelink target
+     -> enterprise DNS forwards the canonical suffix -> hub Resolver
+     -> hub canonical zone -> PE IP for whichever tenant owns the endpoint
+```
+
+A virtual network in another tenant may be linked to a private DNS zone. The
+deploying identity must hold write permission on the zone and on that virtual
+network, in both tenants.
+
+Two constraints make or break this option:
+
+1. **A link resolves; it does not register.** Private Endpoints owned outside the
+   hub never self-register, so their canonical A records are published explicitly
+   through `published_endpoint_records`. Skipping this is the silent failure mode:
+   the name resolves publicly again.
+2. **Do not split the same suffix across per-tenant resolvers.** When a query does
+   not match a zone linked to the resolver's virtual network, the resolver falls
+   through to public Azure DNS and returns a *successful* public answer. Enterprise
+   DNS sees a valid response, never retries the next forwarder, and the client
+   connects publicly. Multiple forwarders are only safe when every target serves
+   the same complete namespace.
+
+Cross-tenant linking of DNS forwarding rulesets is not supported, and Azure DNS
+Private Resolver is not compatible with Azure Lighthouse, so neither is used here.
+
 ## Terraform MCP and AVM sources
 
 The template uses current Terraform MCP catalog examples and pins:
@@ -97,7 +133,7 @@ AzureRM exception based on the provider schema returned by Terraform MCP.
 Run from the selected child directory only:
 
 ```bash
-cd standard-contexts  # or: cd prefixed-backing
+cd standard-contexts  # or: cd prefixed-backing, cd hub-canonical-zones
 cp terraform.tfvars.example terraform.tfvars
 terraform fmt -check -recursive
 terraform init -backend=false -input=false

@@ -1,0 +1,15 @@
+{
+  "description": "Approved private MCP tools for the Microsoft Foundry Prompt Agent.",
+  "tools": [
+    {
+      "type": "mcp",
+      "server_label": "remote-mcp",
+      "server_url": "https://replace.invalid/mcp",
+      "require_approval": "always",
+      "project_connection_id": "replace-source-connection",
+      "allowed_tools": [
+        "replace-with-approved-read-only-tool"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,43 @@
+subscription_id     = "00000000-0000-0000-0000-000000000000"
+tenant_id           = "11111111-1111-1111-1111-111111111111"
+location            = "eastus"
+resource_group_name = "rg-foundry-agent-eus-dev"
+base_name           = "agent-eus-dev"
+foundry_account_name = "aif-agent-eus-dev-example"
+project_name         = "agent-teams"
+project_display_name = "Private Agent for Teams"
+
+model_deployment_name = "gpt-5-mini"
+model_name            = "gpt-5-mini"
+model_version         = "replace-with-region-supported-version"
+model_sku             = "GlobalStandard"
+model_capacity        = 1
+
+agent_subnet_resource_id           = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-eus-dev/providers/Microsoft.Network/virtualNetworks/vnet-agent-eus-dev/subnets/snet-agent"
+private_endpoint_subnet_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-eus-dev/providers/Microsoft.Network/virtualNetworks/vnet-agent-eus-dev/subnets/snet-private-endpoints"
+mcp_subnet_resource_id             = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network-eus-dev/providers/Microsoft.Network/virtualNetworks/vnet-agent-eus-dev/subnets/snet-mcp"
+
+storage_account_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-data-eus-dev/providers/Microsoft.Storage/storageAccounts/stagentexample"
+cosmos_db_resource_id       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-data-eus-dev/providers/Microsoft.DocumentDB/databaseAccounts/cosmos-agent-example"
+ai_search_resource_id       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-data-eus-dev/providers/Microsoft.Search/searchServices/srch-agent-example"
+key_vault_resource_id       = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-data-eus-dev/providers/Microsoft.KeyVault/vaults/kv-agent-example"
+
+foundry_private_dns_zone_resource_ids = [
+  "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns/providers/Microsoft.Network/privateDnsZones/privatelink.cognitiveservices.azure.com",
+  "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns/providers/Microsoft.Network/privateDnsZones/privatelink.openai.azure.com",
+  "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns/providers/Microsoft.Network/privateDnsZones/privatelink.services.ai.azure.com",
+]
+storage_blob_private_dns_zone_resource_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns/providers/Microsoft.Network/privateDnsZones/privatelink.blob.core.windows.net"
+cosmos_db_private_dns_zone_resource_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns/providers/Microsoft.Network/privateDnsZones/privatelink.documents.azure.com"
+ai_search_private_dns_zone_resource_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns/providers/Microsoft.Network/privateDnsZones/privatelink.search.windows.net"
+key_vault_private_dns_zone_resource_id     = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-dns/providers/Microsoft.Network/privateDnsZones/privatelink.vaultcore.azure.net"
+
+agent_publications = {}
+
+tags = {
+  Architecture   = "foundry-agent-teams-standard-private-byor"
+  DeployedByRepo = "replace-with-org-and-repo"
+  DeployedConfig = "replace-with-config-name"
+  Environment    = "dev"
+  Workload       = "foundry-agent-teams"
+}

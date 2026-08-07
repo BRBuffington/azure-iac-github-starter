@@ -15,6 +15,14 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-08-07 — Foundry public and private patterns are independent staged roots
+The Foundry agent-to-Teams starter keeps public and Standard/BYO-private
+architectures in separate roots and states. Terraform owns Azure resources;
+repository JSON plus the human-gated data-plane workflow own immutable toolbox
+versions, Prompt Agent versions, identity handoff, and Microsoft 365 publication.
+The private root reuses existing ingress and platform-owned BYOR/DNS resources by
+input rather than creating a gateway or a second copy of shared services.
+
 ### 2026-07-28 — fixed starter composition belongs in readable locals
 The cross-tenant DNS roots accept only customer facts such as provider resource
 IDs, optional existing zone IDs, a DNS label and TTL, and resolver addresses.

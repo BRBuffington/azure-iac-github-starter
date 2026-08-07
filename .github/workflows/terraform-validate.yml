@@ -9,9 +9,12 @@ on:
     paths:
       - "infra/**"
       - "examples/cross-tenant-private-link-dns/**"
+      - "examples/foundry-agent-teams/**"
+      - ".github/scripts/test_foundry_agent_teams_options.py"
       - ".github/scripts/test_private_dns_option_separation.py"
       - "policy/**"
       - ".github/workflows/terraform-*.yml"
+      - ".github/workflows/foundry-agent-data-plane.yml"
   workflow_dispatch:
 
 permissions:
@@ -174,3 +177,59 @@ jobs:
       - name: terraform test (mock providers; no Azure calls)
         run: terraform test -no-color
         working-directory: examples/cross-tenant-private-link-dns/${{ matrix.option }}
+
+  validate-foundry-agent-teams-option:
+    name: validate-foundry-${{ matrix.option }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        option:
+          - public
+          - standard-private-byor
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Test independent Foundry roots and data-plane contracts
+        run: python "${GITHUB_WORKSPACE}/.github/scripts/test_foundry_agent_teams_options.py"
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+        working-directory: examples/foundry-agent-teams/${{ matrix.option }}
+
+      - name: Install Checkov (pinned)
+        run: python -m pip install --disable-pip-version-check checkov==3.3.8
+
+      - name: Test fail-closed Checkov gate
+        run: python "${GITHUB_WORKSPACE}/.github/scripts/test_checkov_fail_closed.py"
+
+      - name: IaC security scan (Checkov)
+        run: python "${GITHUB_WORKSPACE}/.github/scripts/checkov_fail_closed.py" --directory "${GITHUB_WORKSPACE}/examples/foundry-agent-teams/${{ matrix.option }}"
+
+      - name: terraform init (no backend)
+        run: terraform init -input=false -backend=false
+        working-directory: examples/foundry-agent-teams/${{ matrix.option }}
+
+      - name: terraform validate
+        run: terraform validate -no-color
+        working-directory: examples/foundry-agent-teams/${{ matrix.option }}
+
+      - name: terraform test (root contracts; no Azure calls)
+        run: terraform test -no-color
+        working-directory: examples/foundry-agent-teams/${{ matrix.option }}

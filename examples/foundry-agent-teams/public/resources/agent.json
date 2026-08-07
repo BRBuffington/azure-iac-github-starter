@@ -1,0 +1,18 @@
+{
+  "name": "replace-agent-name",
+  "description": "A Microsoft Foundry Prompt Agent published to Microsoft Teams and Microsoft 365 Copilot.",
+  "definition": {
+    "kind": "prompt",
+    "model": "replace-model-deployment",
+    "instructions": "Use only the approved toolbox tools. Ground answers in tool results, state when evidence is unavailable, and request approval before consequential operations.",
+    "tools": [
+      {
+        "type": "mcp",
+        "server_label": "toolbox",
+        "server_url": "https://replace.invalid/toolbox",
+        "require_approval": "always",
+        "project_connection_id": "replace-toolbox-connection"
+      }
+    ]
+  }
+}

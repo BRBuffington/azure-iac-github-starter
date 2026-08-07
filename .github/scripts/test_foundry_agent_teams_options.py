@@ -57,6 +57,8 @@ def main() -> None:
         assert "avm-ptn-aiml-ai-foundry/azurerm" in combined
         assert "avm-res-botservice-botservice/azurerm" in combined
         assert "/agents/{name}/microsoft365/publish?api-version=v1" in combined
+        assert "instance_identity.principal_id to bot service msaappid" in combined
+        assert "do not substitute client_id" in combined
 
     assert roots[0] != roots[1]
     for root in roots:

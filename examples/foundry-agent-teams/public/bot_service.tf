@@ -5,11 +5,15 @@ module "bot_service" {
 
   for_each = local.agent_publications
 
-  location                     = "global"
-  name                         = each.value.bot_name
-  resource_group_name          = module.resource_group.name
-  display_name                 = each.value.display_name
-  endpoint                     = each.value.activity_endpoint
+  location            = "global"
+  name                = each.value.bot_name
+  resource_group_name = module.resource_group.name
+  display_name        = each.value.display_name
+  endpoint            = each.value.activity_endpoint
+  # Foundry's publication contract intentionally maps
+  # instance_identity.principal_id to Bot Service msaAppId. This differs from
+  # ordinary bot-registration client-ID guidance; do not substitute client_id.
+  # https://learn.microsoft.com/azure/foundry/agents/how-to/publish-copilot-virtual-network#step-1-get-the-agent-identity-and-tenant-id
   microsoft_app_id             = each.value.principal_id
   microsoft_app_tenant_id      = var.tenant_id
   microsoft_app_type           = "SingleTenant"

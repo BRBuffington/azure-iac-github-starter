@@ -9,7 +9,11 @@ module "bot_service" {
   name                = each.value.bot_name
   resource_group_name = module.resource_group.name
   display_name        = each.value.display_name
-  endpoint            = each.value.activity_endpoint
+  # Foundry's publication guide requires the Bot Service endpoint to remain the
+  # agent activity-protocol URL. For a PNA-disabled Foundry account, Step 5 adds
+  # DNS, DNAT, TLS termination, and reverse proxy reachability around this
+  # endpoint; it does not replace the endpoint with a custom bot runtime URL.
+  endpoint = each.value.activity_endpoint
   # Foundry's publication contract intentionally maps
   # instance_identity.principal_id to Bot Service msaAppId. This differs from
   # ordinary bot-registration client-ID guidance; do not substitute client_id.
@@ -18,11 +22,14 @@ module "bot_service" {
   microsoft_app_tenant_id      = var.tenant_id
   microsoft_app_type           = "SingleTenant"
   local_authentication_enabled = false
-  public_network_access        = "Disabled"
-  schema_validation_enabled    = false
-  sku                          = "F0"
-  tags                         = local.common_tags
-  enable_telemetry             = false
+  # Microsoft's Foundry-to-M365 template sets Bot Service publicNetworkAccess
+  # to Disabled while enabling MsTeamsChannel. Private Link is unsupported for
+  # the channel, but Bot Service PNA is still Disabled in the documented flow.
+  public_network_access     = "Disabled"
+  schema_validation_enabled = false
+  sku                       = "F0"
+  tags                      = local.common_tags
+  enable_telemetry          = false
 
   channels = {
     teams = {

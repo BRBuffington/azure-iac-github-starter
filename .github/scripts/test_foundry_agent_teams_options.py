@@ -59,6 +59,13 @@ def main() -> None:
         assert "/agents/{name}/microsoft365/publish?api-version=v1" in combined
         assert "instance_identity.principal_id to bot service msaappid" in combined
         assert "do not substitute client_id" in combined
+        assert "endpoint to remain the" in combined
+        assert "agent activity-protocol url" in combined
+        assert "publicnetworkaccess" in combined
+        assert (
+            "this setting does not disable" in combined
+            or "bot service pna is still disabled" in combined
+        )
 
     assert roots[0] != roots[1]
     for root in roots:

@@ -1,0 +1,287 @@
+name: foundry-agent-data-plane
+
+on:
+  workflow_dispatch:
+    inputs:
+      root:
+        description: Standalone Terraform/source root
+        type: choice
+        options:
+          - public
+          - standard-private-byor
+        default: public
+      operation:
+        description: Configure the toolbox/agent or publish after Bot Service apply
+        type: choice
+        options:
+          - configure
+          - publish
+        default: configure
+      agent_name:
+        description: Prompt Agent name
+        type: string
+        required: true
+      toolbox_name:
+        description: Foundry Toolbox name
+        type: string
+        required: true
+      bot_name:
+        description: Terraform Bot Service name used in the handoff artifact
+        type: string
+        required: true
+      agent_display_name:
+        description: Teams and Microsoft 365 display name
+        type: string
+        required: true
+      app_version:
+        description: Microsoft 365 semantic app version
+        type: string
+        default: 1.0.0
+      publish_scope:
+        description: Shared for a pilot; Tenant requires Microsoft 365 admin approval
+        type: choice
+        options:
+          - Shared
+          - Tenant
+        default: Shared
+      bot_service_arm_id:
+        description: Required only for publish; output from the reviewed Terraform Bot Service apply
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: foundry-agent-data-plane-${{ inputs.root }}-${{ inputs.agent_name }}-${{ inputs.operation }}
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    if: ${{ inputs.operation == 'configure' }}
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    environment: ${{ vars.PLAN_ENVIRONMENT || 'dev' }}-apply
+    env:
+      ROOT_DIR: examples/foundry-agent-teams/${{ inputs.root }}
+      AGENT_NAME: ${{ inputs.agent_name }}
+      TOOLBOX_NAME: ${{ inputs.toolbox_name }}
+      BOT_NAME: ${{ inputs.bot_name }}
+      AGENT_DISPLAY_NAME: ${{ inputs.agent_display_name }}
+      PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
+      MODEL_DEPLOYMENT_NAME: ${{ vars.FOUNDRY_MODEL_DEPLOYMENT_NAME }}
+      MCP_ENDPOINT: ${{ vars.FOUNDRY_MCP_ENDPOINT }}
+      MCP_AUTHORIZATION_URL: ${{ vars.FOUNDRY_MCP_AUTHORIZATION_URL }}
+      MCP_TOKEN_URL: ${{ vars.FOUNDRY_MCP_TOKEN_URL }}
+      MCP_SCOPES: ${{ vars.FOUNDRY_MCP_SCOPES }}
+      MCP_CLIENT_ID: ${{ secrets.FOUNDRY_MCP_CLIENT_ID }}
+      MCP_CLIENT_SECRET: ${{ secrets.FOUNDRY_MCP_CLIENT_SECRET }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate inputs and repository definitions
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$AGENT_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,63}$ ]] || { echo "::error::invalid agent_name"; exit 1; }
+          [[ "$TOOLBOX_NAME" =~ ^[a-z0-9]([a-z0-9-]{0,62}[a-z0-9])?$ ]] || { echo "::error::invalid toolbox_name"; exit 1; }
+          [[ "$BOT_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9._-]{1,41}$ ]] || { echo "::error::invalid bot_name"; exit 1; }
+          test -n "$PROJECT_ENDPOINT"
+          test -n "$MODEL_DEPLOYMENT_NAME"
+          test -n "$MCP_ENDPOINT"
+          test -n "$MCP_AUTHORIZATION_URL"
+          test -n "$MCP_TOKEN_URL"
+          test -n "$MCP_SCOPES"
+          test -n "$MCP_CLIENT_ID"
+          test -n "$MCP_CLIENT_SECRET"
+          jq -e . "$ROOT_DIR/resources/toolbox.json" >/dev/null
+          jq -e . "$ROOT_DIR/resources/agent.json" >/dev/null
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_APPLY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - uses: Azure/setup-azd@v2
+
+      - name: Install Microsoft Foundry azd extension
+        shell: bash
+        run: azd ext install microsoft.foundry
+
+      - name: Configure OAuth MCP connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          azd ai project set "$PROJECT_ENDPOINT" --no-prompt
+          azd ai project show --output json
+          SOURCE_CONNECTION_NAME="${AGENT_NAME}-source-mcp"
+          azd ai connection create "$SOURCE_CONNECTION_NAME" \
+            --kind remote-tool \
+            --target "$MCP_ENDPOINT" \
+            --auth-type oauth2 \
+            --authorization-url "$MCP_AUTHORIZATION_URL" \
+            --token-url "$MCP_TOKEN_URL" \
+            --client-id "$MCP_CLIENT_ID" \
+            --client-secret "$MCP_CLIENT_SECRET" \
+            --scopes "$MCP_SCOPES" \
+            --force --no-prompt
+          echo "SOURCE_CONNECTION_NAME=$SOURCE_CONNECTION_NAME" >> "$GITHUB_ENV"
+
+      - name: Create and promote toolbox version from Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(az account get-access-token --resource https://ai.azure.com --query accessToken -o tsv)"
+          jq \
+            --arg endpoint "$MCP_ENDPOINT" \
+            --arg connection "$SOURCE_CONNECTION_NAME" \
+            '.tools[0].server_url = $endpoint | .tools[0].project_connection_id = $connection' \
+            "$ROOT_DIR/resources/toolbox.json" > /tmp/toolbox.json
+          curl --fail-with-body --silent --show-error \
+            -X POST "$PROJECT_ENDPOINT/toolboxes/$TOOLBOX_NAME/versions?api-version=v1" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/toolbox.json > /tmp/toolbox-response.json
+          TOOLBOX_VERSION="$(jq -er '.version' /tmp/toolbox-response.json)"
+          jq -n --arg version "$TOOLBOX_VERSION" '{default_version: $version}' > /tmp/toolbox-promote.json
+          curl --fail-with-body --silent --show-error \
+            -X PATCH "$PROJECT_ENDPOINT/toolboxes/$TOOLBOX_NAME?api-version=v1" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/toolbox-promote.json > /tmp/toolbox-promote-response.json
+          test "$(jq -r '.default_version' /tmp/toolbox-promote-response.json)" = "$TOOLBOX_VERSION"
+          TOOLBOX_ENDPOINT="$PROJECT_ENDPOINT/toolboxes/$TOOLBOX_NAME/mcp?api-version=v1"
+          echo "TOOLBOX_ENDPOINT=$TOOLBOX_ENDPOINT" >> "$GITHUB_ENV"
+          echo "TOOLBOX_VERSION=$TOOLBOX_VERSION" >> "$GITHUB_ENV"
+
+      - name: Configure delegated toolbox connection
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOOLBOX_CONNECTION_NAME="${AGENT_NAME}-toolbox-user"
+          azd ai connection create "$TOOLBOX_CONNECTION_NAME" \
+            --kind remote-tool \
+            --target "$TOOLBOX_ENDPOINT" \
+            --auth-type user-entra-token \
+            --audience https://ai.azure.com \
+            --force --no-prompt
+          echo "TOOLBOX_CONNECTION_NAME=$TOOLBOX_CONNECTION_NAME" >> "$GITHUB_ENV"
+
+      - name: Create Prompt Agent version from Git
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(az account get-access-token --resource https://ai.azure.com --query accessToken -o tsv)"
+          jq \
+            --arg name "$AGENT_NAME" \
+            --arg model "$MODEL_DEPLOYMENT_NAME" \
+            --arg toolbox "$TOOLBOX_ENDPOINT" \
+            --arg connection "$TOOLBOX_CONNECTION_NAME" \
+            '.name = $name | .definition.model = $model | .definition.tools[0].server_url = $toolbox | .definition.tools[0].project_connection_id = $connection' \
+            "$ROOT_DIR/resources/agent.json" > /tmp/agent.json
+          curl --fail-with-body --silent --show-error \
+            -X POST "$PROJECT_ENDPOINT/agents?api-version=v1" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/agent.json > /tmp/agent-response.json
+          AGENT_VERSION="$(jq -er '.version' /tmp/agent-response.json)"
+          PRINCIPAL_ID="$(jq -r '.instance_identity.principal_id // empty' /tmp/agent-response.json)"
+          if [[ -z "$PRINCIPAL_ID" ]]; then
+            curl --fail-with-body --silent --show-error \
+              "$PROJECT_ENDPOINT/agents/$AGENT_NAME?api-version=v1" \
+              -H "Authorization: Bearer $TOKEN" > /tmp/agent-get.json
+            PRINCIPAL_ID="$(jq -er '.instance_identity.principal_id' /tmp/agent-get.json)"
+          fi
+          [[ "$PRINCIPAL_ID" =~ ^[0-9a-fA-F-]{36}$ ]] || { echo "::error::agent identity principal ID missing"; exit 1; }
+          jq -n \
+            --arg agent "$AGENT_NAME" \
+            --arg principal "$PRINCIPAL_ID" \
+            --arg bot "$BOT_NAME" \
+            --arg display "$AGENT_DISPLAY_NAME" \
+            '{agent_publications: {($agent): {principal_id: $principal, bot_name: $bot, display_name: $display}}}' \
+            > agent-handoff.auto.tfvars.json
+          echo "AGENT_VERSION=$AGENT_VERSION" >> "$GITHUB_ENV"
+          echo "PRINCIPAL_ID=$PRINCIPAL_ID" >> "$GITHUB_ENV"
+
+      - name: Upload Terraform identity handoff
+        uses: actions/upload-artifact@v4
+        with:
+          name: foundry-agent-handoff-${{ inputs.root }}-${{ inputs.agent_name }}
+          path: agent-handoff.auto.tfvars.json
+          retention-days: 5
+
+      - name: Configuration summary
+        shell: bash
+        run: |
+          {
+            echo "## Foundry agent configured"
+            echo "- Agent: \`$AGENT_NAME\` version \`$AGENT_VERSION\`"
+            echo "- Toolbox: \`$TOOLBOX_NAME\` version \`$TOOLBOX_VERSION\`"
+            echo "- Principal ID: \`$PRINCIPAL_ID\`"
+            echo "- Next gate: download the handoff artifact, run and review the Bot Service Terraform plan, then apply that exact plan before dispatching \`publish\`."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    if: ${{ inputs.operation == 'publish' }}
+    runs-on: ${{ vars.RUNNER_LABELS && fromJSON(vars.RUNNER_LABELS) || 'ubuntu-latest' }}
+    environment: ${{ vars.PLAN_ENVIRONMENT || 'dev' }}-apply
+    env:
+      ROOT_DIR: examples/foundry-agent-teams/${{ inputs.root }}
+      AGENT_NAME: ${{ inputs.agent_name }}
+      AGENT_DISPLAY_NAME: ${{ inputs.agent_display_name }}
+      APP_VERSION: ${{ inputs.app_version }}
+      PUBLISH_SCOPE: ${{ inputs.publish_scope }}
+      BOT_SERVICE_ARM_ID: ${{ inputs.bot_service_arm_id }}
+      PROJECT_ENDPOINT: ${{ vars.FOUNDRY_PROJECT_ENDPOINT }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Validate publication inputs
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$AGENT_NAME" =~ ^[A-Za-z0-9][A-Za-z0-9-]{0,63}$ ]] || { echo "::error::invalid agent_name"; exit 1; }
+          [[ "$APP_VERSION" =~ ^[1-9][0-9]*\.[0-9]+\.[0-9]+$ ]] || { echo "::error::app_version must be semantic digits and cannot start with zero"; exit 1; }
+          [[ "$BOT_SERVICE_ARM_ID" =~ ^/subscriptions/[0-9a-fA-F-]{36}/resourceGroups/[^/]+/providers/Microsoft.BotService/botServices/[^/]+$ ]] || { echo "::error::bot_service_arm_id is required and must be a Bot Service ARM ID"; exit 1; }
+          test -n "$PROJECT_ENDPOINT"
+          jq -e . "$ROOT_DIR/resources/publish.json" >/dev/null
+
+      - name: Azure login with OIDC
+        uses: azure/login@v2
+        with:
+          client-id: ${{ vars.AZURE_APPLY_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+
+      - name: Publish current agent to Microsoft 365 and Teams
+        shell: bash
+        run: |
+          set -euo pipefail
+          TOKEN="$(az account get-access-token --resource https://ai.azure.com --query accessToken -o tsv)"
+          jq \
+            --arg display "$AGENT_DISPLAY_NAME" \
+            --arg bot "$BOT_SERVICE_ARM_ID" \
+            --arg scope "$PUBLISH_SCOPE" \
+            --arg version "$APP_VERSION" \
+            '.agentDisplayName = $display | .botServiceArmId = $bot | .publishScope = $scope | .appVersion = $version' \
+            "$ROOT_DIR/resources/publish.json" > /tmp/publish.json
+          curl --fail-with-body --silent --show-error \
+            -X POST "$PROJECT_ENDPOINT/agents/$AGENT_NAME/microsoft365/publish?api-version=v1" \
+            -H "Authorization: Bearer $TOKEN" \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/publish.json > /tmp/publish-response.json
+          TITLE_ID="$(jq -er '.titleId' /tmp/publish-response.json)"
+          {
+            echo "## Foundry agent published"
+            echo "- Agent: \`$AGENT_NAME\`"
+            echo "- Scope: \`$PUBLISH_SCOPE\`"
+            echo "- App version: \`$APP_VERSION\`"
+            echo "- Title ID: \`$TITLE_ID\`"
+            echo "- Required acceptance: locate the app in the expected store section, send a real Teams message, and verify the expected MCP-backed reply. The title ID alone is not completion evidence."
+          } >> "$GITHUB_STEP_SUMMARY"

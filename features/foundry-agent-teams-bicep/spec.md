@@ -17,6 +17,9 @@ clearer.
 - A small Bicep template owns Bot Service and the Teams channel for Step 2.
 - Jonathan's script reads the agent identity, verifies Step 2, patches the
   activity protocol, and calls the Step 4 publish API.
+- A separate read-only collector reports PNA, network injection, private
+  endpoints, subnet delegation, VNet and peered-VNet CIDRs, visible roles, and
+  Network Watcher VNet flow-log configuration without mutating Azure.
 - Basic names, metadata, model choices, SKUs, and feature switches have
   overridable client-neutral defaults. Resource IDs, CIDRs, and runtime identity
   values remain explicit.
@@ -43,12 +46,17 @@ clearer.
 - The root is copyable without a dependency on either sibling example.
 - The example parameter files specify only client facts that cannot be safely
   inferred or defaulted.
+- Publication errors remain observed evidence. The template does not infer that
+  sequential 502 and 403 responses share or do not share a root cause.
 
 ## Success criteria
 
 - `az bicep build` compiles `main.bicep` and the example parameter file.
 - CI compiles the foundation, network attachment, and Bot Service templates and
   parses the PowerShell script.
+- Deterministic contracts keep the collector read-only, require VNet rather
+  than retired NSG flow-log discovery, and preserve the non-diagnostic error
+  boundary.
 - A client can start from the example parameter files without restating basic
   template defaults, while retaining clean overrides for every exposed option.
 - The catalog and root README explain the staged deployment and rollback.

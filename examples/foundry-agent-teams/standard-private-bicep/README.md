@@ -42,6 +42,30 @@ inputs when the deployment should create its own zones.
 
 ## Sequence
 
+### 0. Collect read-only network evidence
+
+Before reproducing a publication failure, run the diagnostic collector with an
+identity that can read the Foundry account and its VNet:
+
+```powershell
+./scripts/collect-network-diagnostics.ps1 `
+  -ProjectEndpoint 'https://<account>.services.ai.azure.com/api/projects/<project>' `
+  -BotName '<bot-name>' `
+  -BotResourceGroup '<bot-resource-group>' `
+  -OutputPath './foundry-network-diagnostics-<timestamp>.json'
+```
+
+The collector is read-only. It reports Foundry PNA and network injection,
+private endpoint state, the agent subnet delegation, local and peered VNet
+address spaces, visible Azure roles, and existing Azure Network Watcher VNet
+flow logs. It checks all Microsoft-documented reserved ranges across the VNet
+and its peers.
+
+VNet flow logs are not retroactive. Configure them through the client's IaC
+before reproducing the issue if none exist. New NSG flow logs are retired; use
+Network Watcher VNet flow logs. The collector intentionally does not create or
+update a flow log.
+
 ### 1. Deploy the private Foundry foundation
 
 Edit `foundation/main.bicepparam`, then run a what-if and deployment through the
@@ -67,8 +91,9 @@ name and an explicitly approved, non-overlapping CIDR in
 
 ### 2. Read the agent identity
 
-Create and test the Prompt Agent in the deployed project. Run the script without
-`-Execute` from a machine that resolves the private project endpoint:
+Create and test the Prompt Agent in the deployed project, and select the active
+agent version consumers should receive. Run the script without `-Execute` from
+a machine that resolves the private project endpoint:
 
 ```powershell
 ./scripts/oneThroughFour.ps1 `
@@ -83,7 +108,10 @@ Create and test the Prompt Agent in the deployed project. Run the script without
 ```
 
 Preview prints `Principal ID`, `Tenant ID`, and the activity endpoint. Copy those
-values into `bot-service.bicepparam`.
+values into `bot-service.bicepparam`. It also checks TCP 443 reachability,
+displays the active-version selector when the API returns it, reports visible
+agent endpoint settings, and validates the documented metadata limits. The
+Step 0 collector owns the deeper Azure RBAC and network evidence pass.
 
 ### 3. Deploy Bot Service with Bicep
 
@@ -107,6 +135,21 @@ with `publishScope=Shared`. Success returns a `titleId` and `teamsAppId`.
 
 Step 5 public ingress is a separate client architecture decision and is not
 included in this Step 4 template.
+
+## Troubleshooting boundary
+
+The prechecks collect evidence; they do not identify the cause of every service
+response. In particular, an HTTP 502 followed by an HTTP 403 or
+`dependency_error` does not prove that the errors share a cause or have separate
+causes. Preserve the full status, service error code, and request ID for each
+attempt.
+
+For `publishScope=Shared`, Microsoft documents no Microsoft 365 admin-approval
+requirement. The Azure preflight cannot verify every Microsoft 365 Copilot
+extensibility, service-plan, or tenant app-policy control. If the service returns
+`Copilot extensibility is not enabled for this user`, keep the request ID and
+route the evidence to Microsoft 365/Copilot support rather than classifying it
+as network, Azure RBAC, licensing, or tenant policy without service-side proof.
 
 ## Validation
 

@@ -15,6 +15,14 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-08-14 — Publication diagnostics collect evidence without naming the cause
+The private Foundry client flow includes a read-only collector for PNA, network
+injection, VNet/peer CIDRs, roles, private endpoints, and Network Watcher VNet
+flow logs. Sequential 502/403 responses remain separate observations until
+service-side evidence links or distinguishes them; the client script preserves
+the service code and request ID instead of inferring network, RBAC, licensing,
+or tenant policy.
+
 ### 2026-08-14 — Compose defaults with current Microsoft CAF abbreviations
 The Foundry Bicep starter composes workload, region, and environment inputs once,
 then applies Microsoft resource prefixes (`aif`, `proj`, `srch`, `cosno`, `st`,

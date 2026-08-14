@@ -2,6 +2,29 @@
 
 Continuous decision log. Newest entries appear first.
 
+## 2026-08-14 - Restore the promised network evidence collector
+
+The initial recommendation included a read-only collector for PNA, network
+injection, local and peered VNet CIDRs, roles, and flow-log configuration. It
+was incorrectly removed while narrowing the overbuilt first implementation.
+The collector is restored without changing Jonathan's deployment graph. It
+lists Azure Network Watcher VNet flow logs; new NSG flow logs are retired, and
+logs cannot recover traffic from before enablement.
+
+The August 14 BJC meeting moved the observed Step 4 response from the earlier
+502 to `dependency_error` / 403 with `Copilot extensibility is not enabled for
+this user`, but it did not prove whether those responses share a cause or which
+Microsoft 365 control produced the 403. Prechecks now preserve the status,
+service code, and request ID while explicitly refusing to classify the cause.
+The meeting also confirmed that recreating Step 2 produced the expected MSA app
+ID, tenant, and activity endpoint, so the Bicep resource shape did not change.
+
+Five troubleshooting attachments were recovered from the July 23 and July 30
+email thread: three architecture PDFs, `create_toolbox.py`, and a screenshot of
+that same source. The PDFs confirm that network injection must be present when
+the hosted-agent account is created and that MCP OAuth state is a separate
+credential layer; neither establishes the Step 4 403 cause.
+
 ## 2026-08-14 - Use the proven baseline with ergonomic IaC defaults
 
 Fidelity is not the end goal. Jonathan's working package remains the MVP and

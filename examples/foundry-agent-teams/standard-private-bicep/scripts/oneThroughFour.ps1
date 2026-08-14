@@ -66,6 +66,7 @@ param(
 
     [Parameter(Mandatory)]
     [ValidateNotNullOrEmpty()]
+    [ValidateLength(1, 32)]
     [string]$DeveloperName,
 
     [Parameter(Mandatory)]
@@ -83,7 +84,7 @@ param(
     [ValidateNotNullOrEmpty()]
     [string]$AgentDisplayName,
 
-    [ValidatePattern('^\d+\.\d+\.\d+$')]
+    [ValidatePattern('^[1-9]\d*\.\d+\.\d+$')]
     [string]$AppVersion = '1.0.0',
 
     [ValidateLength(1, 80)]
@@ -177,12 +178,78 @@ function Invoke-FoundryRequest {
         return Invoke-RestMethod @request
     }
     catch {
+        $response = Get-OptionalProperty -InputObject $_.Exception -Name 'Response'
+        $statusCode = $null
+        $responseRequestId = $null
+        if ($null -ne $response) {
+            $status = Get-OptionalProperty -InputObject $response -Name 'StatusCode'
+            if ($null -ne $status) {
+                $statusCode = [int]$status
+            }
+            $headers = Get-OptionalProperty -InputObject $response -Name 'Headers'
+            if ($null -ne $headers) {
+                foreach ($headerName in @('x-ms-request-id', 'request-id', 'x-ms-correlation-request-id')) {
+                    $values = $null
+                    if ($headers.TryGetValues($headerName, [ref]$values)) {
+                        $responseRequestId = @($values)[0]
+                        break
+                    }
+                }
+            }
+        }
         $details = $_.ErrorDetails.Message
         if ([string]::IsNullOrWhiteSpace($details)) {
             $details = $_.Exception.Message
         }
 
-        throw "$Method $Uri failed.`n$details"
+        $evidence = @()
+        if ($null -ne $statusCode) {
+            $evidence += "HTTP $statusCode"
+        }
+        if (-not [string]::IsNullOrWhiteSpace([string]$responseRequestId)) {
+            $evidence += "response request ID $responseRequestId"
+        }
+        $evidenceText = $(if ($evidence.Count) { ' (' + ($evidence -join '; ') + ')' } else { '' })
+        throw "$Method $Uri failed$evidenceText.`n$details"
+    }
+}
+
+function Get-OptionalProperty {
+    param(
+        [object]$InputObject,
+
+        [Parameter(Mandatory)]
+        [string]$Name
+    )
+
+    if ($null -eq $InputObject) {
+        return $null
+    }
+
+    $property = $InputObject.PSObject.Properties[$Name]
+    return $(if ($null -eq $property) { $null } else { $property.Value })
+}
+
+function Test-TcpEndpoint {
+    param(
+        [Parameter(Mandatory)]
+        [string]$HostName,
+
+        [int]$Port = 443,
+
+        [int]$TimeoutMilliseconds = 5000
+    )
+
+    $client = [System.Net.Sockets.TcpClient]::new()
+    try {
+        $task = $client.ConnectAsync($HostName, $Port)
+        return $task.Wait($TimeoutMilliseconds) -and $client.Connected
+    }
+    catch {
+        return $false
+    }
+    finally {
+        $client.Dispose()
     }
 }
 
@@ -252,6 +319,11 @@ else {
     }
 }
 
+if (-not (Test-TcpEndpoint -HostName $foundryHost)) {
+    throw "The Foundry endpoint $foundryHost is not reachable on TCP 443 from this machine. Run from the VNet or a connected network before continuing."
+}
+Write-Host 'TCP 443      : reachable'
+
 $providerState = & az provider show --namespace Microsoft.BotService --query registrationState -o tsv 2>$null
 if ($LASTEXITCODE -ne 0 -or $providerState.Trim() -ne 'Registered') {
     throw "Microsoft.BotService is not registered in subscription $subscriptionId. Register it before continuing."
@@ -265,9 +337,12 @@ $foundryToken = $foundryToken.Trim()
 
 Write-Step -Number 1 -Title 'Get the agent identity and tenant ID' -Mode 'READ-ONLY'
 $agent = Invoke-FoundryRequest -Method GET -Uri $agentUri -AccessToken $foundryToken
-$agentIdentity = $agent.instance_identity
+$agentEndpoint = Get-OptionalProperty -InputObject $agent -Name 'agent_endpoint'
+$agentIdentity = Get-OptionalProperty -InputObject $agent -Name 'instance_identity'
 if ($null -eq $agentIdentity) {
-    $agentIdentity = $agent.versions.latest.instance_identity
+    $versions = Get-OptionalProperty -InputObject $agent -Name 'versions'
+    $latestVersion = Get-OptionalProperty -InputObject $versions -Name 'latest'
+    $agentIdentity = Get-OptionalProperty -InputObject $latestVersion -Name 'instance_identity'
 }
 
 $agentPrincipalId = [string]$agentIdentity.principal_id
@@ -280,8 +355,25 @@ Write-Host ("Agent ID     : {0}" -f $agent.id)
 Write-Host ("Principal ID : {0}" -f $agentPrincipalId)
 Write-Host ("Client ID    : {0}" -f $agentClientId)
 Write-Host ("Tenant ID    : {0}" -f $tenantId)
-Write-Host ("Protocols    : {0}" -f (($agent.agent_endpoint.protocols | ForEach-Object { [string]$_ }) -join ', '))
-Write-Host ("Authorization: {0}" -f (($agent.agent_endpoint.authorization_schemes | ForEach-Object { [string]$_.type }) -join ', '))
+$protocols = @(Get-OptionalProperty -InputObject $agentEndpoint -Name 'protocols')
+$authorizationSchemes = @(Get-OptionalProperty -InputObject $agentEndpoint -Name 'authorization_schemes')
+Write-Host ("Protocols    : {0}" -f (($protocols | ForEach-Object { [string]$_ }) -join ', '))
+Write-Host ("Authorization: {0}" -f (($authorizationSchemes | ForEach-Object { [string]$_.type }) -join ', '))
+
+$versionSelector = Get-OptionalProperty -InputObject $agentEndpoint -Name 'version_selector'
+$versionRules = @(Get-OptionalProperty -InputObject $versionSelector -Name 'version_selection_rules')
+if ($versionRules.Count -eq 0) {
+    Write-Warning 'The active agent version could not be verified from the API response. Confirm the active version in Foundry before publishing.'
+}
+else {
+    $versionSummary = $versionRules | ForEach-Object {
+        $version = Get-OptionalProperty -InputObject $_ -Name 'agent_version'
+        $traffic = Get-OptionalProperty -InputObject $_ -Name 'traffic_percentage'
+        $type = Get-OptionalProperty -InputObject $_ -Name 'type'
+        "type=$type version=$version traffic=$traffic"
+    }
+    Write-Host ("Active version: {0}" -f ($versionSummary -join '; '))
+}
 
 Write-Step -Number 2 -Title 'Verify Bicep-owned Azure Bot Service and Teams channel' -Mode 'READ-ONLY'
 $resourceGroupExists = $false
@@ -355,6 +447,8 @@ else {
 }
 
 Write-Step -Number 4 -Title 'Publish the agent to Microsoft 365' -Mode $(if ($Execute) { 'EXECUTE' } else { 'PREVIEW' })
+Write-Host 'M365 preflight: Shared scope requires no admin approval. Azure preflight cannot verify tenant-level Copilot extensibility, service-plan, or app-policy controls.'
+Write-Host 'M365 diagnosis: Preserve any HTTP status, service error code, and request ID. Do not infer network, Azure RBAC, licensing, or tenant policy from a dependency_error alone.'
 $publishUri = "$ProjectEndpoint/agents/$encodedAgentName/microsoft365/publish?api-version=v1"
 $publishBody = @{
     agentDisplayName = $AgentDisplayName
@@ -378,7 +472,12 @@ if (-not $Execute) {
     Write-Host 'Run the same command with -Execute to perform Steps 3 and 4.'
 }
 else {
-    $publishResult = Invoke-FoundryRequest -Method POST -Uri $publishUri -AccessToken $foundryToken -Body $publishBody
+    try {
+        $publishResult = Invoke-FoundryRequest -Method POST -Uri $publishUri -AccessToken $foundryToken -Body $publishBody
+    }
+    catch {
+        throw "Step 4 publication failed. The service response below is evidence, not a root-cause classification.`n$($_.Exception.Message)"
+    }
     Write-Host 'Publication succeeded.'
     Write-Host ("Title ID     : {0}" -f $publishResult.titleId)
     Write-Host ("Teams App ID : {0}" -f $publishResult.teamsAppId)

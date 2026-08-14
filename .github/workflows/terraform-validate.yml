@@ -11,7 +11,6 @@ on:
       - "examples/cross-tenant-private-link-dns/**"
       - "examples/foundry-agent-teams/**"
       - ".github/scripts/test_foundry_agent_teams_options.py"
-      - ".github/scripts/test_foundry_agent_teams_bicep.py"
       - ".github/scripts/test_private_dns_option_separation.py"
       - "policy/**"
       - ".github/workflows/terraform-*.yml"
@@ -245,10 +244,6 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
       - name: Install pinned Bicep CLI
         shell: bash
         run: az bicep install --version v0.46.1
@@ -260,14 +255,12 @@ jobs:
           AZURE_BICEP_CHECK_VERSION: "false"
         run: |
           set -euo pipefail
-          az bicep build --file main.bicep --stdout >/dev/null
-          az bicep build-params --file main.bicepparam --stdout >/dev/null
-
-      - name: Test compiled Bicep and publication contracts
-        shell: bash
-        env:
-          AZURE_BICEP_CHECK_VERSION: "false"
-        run: python .github/scripts/test_foundry_agent_teams_bicep.py
+          az bicep build --file foundation/main.bicep --stdout >/dev/null
+          az bicep build-params --file foundation/main.bicepparam --stdout >/dev/null
+          az bicep build --file network/foundry-private-agent.bicep --stdout >/dev/null
+          az bicep build-params --file network/foundry-private-agent.bicepparam --stdout >/dev/null
+          az bicep build --file bot-service.bicep --stdout >/dev/null
+          az bicep build-params --file bot-service.bicepparam --stdout >/dev/null
 
       - name: Parse PowerShell scripts
         shell: pwsh

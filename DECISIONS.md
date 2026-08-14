@@ -15,12 +15,23 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
-### 2026-08-14 — Preserve the proven private Foundry pattern as a Bicep root
-The third Foundry agent-to-Teams option is a standalone, client-parameterized
-Bicep root rather than a Terraform translation. Bicep owns every ARM-supported
-resource, including network injection, capability hosts, BYOR connections/RBAC,
-private endpoints, Bot Service, and Teams channel; delegated PowerShell owns only
-Prompt Agent and Microsoft 365 REST operations that ARM cannot represent.
+### 2026-08-14 — Compose defaults with current Microsoft CAF abbreviations
+The Foundry Bicep starter composes workload, region, and environment inputs once,
+then applies Microsoft resource prefixes (`aif`, `proj`, `srch`, `cosno`, `st`,
+`cr`, `appi`, `log`, `pep`, `vnet`, `snet`, and `bot`). Full-name parameters
+remain available for existing resources and client-specific exceptions.
+
+### 2026-08-14 — Use the proven Step 4 flow as a baseline, not a ceiling
+Jonathan's working Bicep and PowerShell remain the client MVP and troubleshooting
+path. Improve individual steps when IaC is simpler, as with Bot Service, and
+default standard values so adopters supply only environment-specific resource
+IDs, CIDRs, and identities while retaining explicit overrides.
+
+### 2026-08-14 — Reuse the working private Foundry Bicep package directly
+The third Foundry agent-to-Teams option preserves the already-working Bicep
+foundation, network attachment, and Step 1-4 PowerShell flow rather than
+reimplementing them. Only client parameter examples are generalized; the small
+Step 2 Bot Service template keeps supported ARM resources in IaC.
 
 ### 2026-08-07 — Foundry public and private patterns are independent staged roots
 The Foundry agent-to-Teams starter keeps public and Standard/BYO-private

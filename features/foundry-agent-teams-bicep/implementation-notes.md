@@ -2,6 +2,28 @@
 
 Continuous decision log. Newest entries appear first.
 
+## 2026-08-14 - Use the proven baseline with ergonomic IaC defaults
+
+Fidelity is not the end goal. Jonathan's working package remains the MVP and
+troubleshooting baseline, while targeted improvements are encouraged when they
+reduce client work without hiding the proven flow. Step 2 stays in Bicep;
+standard names, metadata, model settings, SKUs, and DNS resource-group reuse now
+have clean defaults or shorthands. Resource IDs, CIDRs, and runtime identity
+values remain explicit because guessing them would be unsafe.
+
+Resource names follow the same composition pattern as Terraform locals:
+workload, organization-defined region, and environment inputs feed
+resource-specific name variables, with full-name parameters retained only as
+escape hatches. Resource-type prefixes are grounded in the current Microsoft
+CAF abbreviation table; definite upstream mismatches (`acr`, `law`, and
+suffix-style private endpoint names) were corrected to `cr`, `log`, and `pep`.
+
+## 2026-08-14 - Replace the rewrite with the working package
+
+The first implementation re-created Jonathan's architecture and over-expanded
+the original task. It is replaced by his exact foundation, network attachment,
+and Step 1-4 script; only client parameters and Bicep-owned Step 2 are adapted.
+
 ## 2026-08-14 - Preserve the Foundry activity endpoint through Step 5
 
 Microsoft's publication guide requires Bot Service to retain the Foundry

@@ -1,6 +1,6 @@
 # Microsoft Foundry agent to Teams starter
 
-This directory is a catalog of two independent Terraform roots for publishing a
+This directory is a catalog of three independent roots for publishing a
 Microsoft Foundry Prompt Agent to Microsoft Teams and Microsoft 365 Copilot.
 Choose one child root and copy only that root into the adopting repository.
 
@@ -11,9 +11,14 @@ Choose one child root and copy only that root into the adopting repository.
   network, customer-owned Storage, Cosmos DB, and Azure AI Search, private
   endpoints, and a private MCP endpoint. It is added and validated independently
   from the public root.
+- [`standard-private-bicep/`](standard-private-bicep/) is a parameterized Bicep
+  Standard Agent Setup for clients that keep this architecture in Bicep. Bicep
+  owns the network injection, BYOR connections/RBAC, capability host, private
+  endpoints, Bot Service, and Teams channel. Delegated PowerShell is limited to
+  the Prompt Agent and Microsoft 365 REST operations that ARM cannot represent.
 
-The roots do not share modules, variables, or state. They demonstrate the same
-staged publication contract:
+The roots do not share modules, variables, or state. The two Terraform roots
+demonstrate this staged publication contract:
 
 1. Terraform provisions the Foundry control-plane resources.
 2. A reviewed GitHub Actions stage applies the repository-owned connection,
@@ -28,6 +33,10 @@ staged publication contract:
 Terraform does not use `local-exec` or provisioners for data-plane operations.
 The repository definitions are authoritative, but Foundry does not watch Git;
 the workflow must reapply changed definitions.
+
+The Bicep root follows the same separation of control plane and data plane, but
+uses a delegated PowerShell publisher instead of the app-only OIDC workflow. Its
+README documents the two Bicep deployments around the agent-identity handoff.
 
 ## References
 

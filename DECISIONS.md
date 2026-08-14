@@ -15,6 +15,13 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-08-14 — Preserve the proven private Foundry pattern as a Bicep root
+The third Foundry agent-to-Teams option is a standalone, client-parameterized
+Bicep root rather than a Terraform translation. Bicep owns every ARM-supported
+resource, including network injection, capability hosts, BYOR connections/RBAC,
+private endpoints, Bot Service, and Teams channel; delegated PowerShell owns only
+Prompt Agent and Microsoft 365 REST operations that ARM cannot represent.
+
 ### 2026-08-07 — Foundry public and private patterns are independent staged roots
 The Foundry agent-to-Teams starter keeps public and Standard/BYO-private
 architectures in separate roots and states. Terraform owns Azure resources;

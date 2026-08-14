@@ -31,10 +31,10 @@ if ($definitions.Count -ne $functionNames.Count) {
 }
 $definitions | ForEach-Object { Invoke-Expression $_.Extent.Text }
 
-if (-not (Test-Rfc1918Cidr -Cidr '10.153.78.0/23')) {
+if (-not (Test-Rfc1918Cidr -Cidr '10.20.4.0/23')) {
     throw 'A valid RFC1918 delegated subnet was rejected.'
 }
-if (Test-CidrOverlap -Left '10.153.78.0/23' -Right '100.64.0.0/11') {
+if (Test-CidrOverlap -Left '10.20.4.0/23' -Right '100.64.0.0/11') {
     throw 'An RFC1918 delegated subnet falsely overlapped the reserved CGNAT range.'
 }
 if (-not (Test-CidrOverlap -Left '100.64.1.0/24' -Right '100.64.0.0/11')) {

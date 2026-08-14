@@ -61,6 +61,19 @@ def main() -> None:
     ):
         assert expected in readme_flat, expected
 
+    public_text = "\n".join(
+        _text(path)
+        for path in (
+            ROOT / "README.md",
+            ROOT / "scripts" / "oneThroughFour.ps1",
+            ROOT / "scripts" / "collect-network-diagnostics.ps1",
+            REPO / "features" / "foundry-agent-teams-bicep" / "spec.md",
+            REPO / "features" / "foundry-agent-teams-bicep" / "implementation-notes.md",
+        )
+    ).casefold()
+    for customer_marker in ("b" + "jc", "10.153." + "78.0/23"):
+        assert customer_marker not in public_text, customer_marker
+
     print("Foundry Bicep publication contracts passed")
 
 

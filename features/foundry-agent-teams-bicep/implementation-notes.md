@@ -2,6 +2,12 @@
 
 Continuous decision log. Newest entries appear first.
 
+## 2026-08-14 - Preserve the Foundry activity endpoint through Step 5
+
+Microsoft's publication guide requires Bot Service to retain the Foundry
+activity-protocol URL. Public ingress makes that hostname reachable through DNS,
+DNAT, TLS, and reverse proxy; it is not a replacement Bot Service endpoint.
+
 ## 2026-08-14 - Keep the customer template narrow
 
 Removed the diagnostics collector, CIDR engine, subnet attachment, and shared

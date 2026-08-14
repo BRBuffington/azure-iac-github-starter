@@ -30,6 +30,10 @@ resource botService 'Microsoft.BotService/botServices@2022-09-15' = {
   }
   properties: {
     displayName: displayName
+    // Microsoft Step 2 requires this exact Foundry activity-protocol URL.
+    // Step 5 makes its hostname publicly reachable through DNS, DNAT, TLS, and
+    // reverse proxy; it does not replace the Bot Service endpoint with a proxy URL.
+    // https://learn.microsoft.com/azure/foundry/agents/how-to/publish-copilot-virtual-network#step-2-create-the-azure-bot-service-resource
     endpoint: activityEndpoint
     msaAppId: agentPrincipalId
     msaAppTenantId: tenantId

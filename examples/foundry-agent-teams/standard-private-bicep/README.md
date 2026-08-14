@@ -167,6 +167,10 @@ endpoint through an approved public TLS entry point and reverse proxy. Reuse the
 client's Application Gateway, compatible APIM deployment, firewall plus proxy,
 or equivalent architecture. This example does not create a gateway product.
 
+Keep the Bot Service `endpoint` set to the Foundry activity-protocol URL from
+Step 2. Step 5 publishes DNS and routes that hostname through the client's entry
+point; it does not substitute a different proxy URL in Bot Service.
+
 Restrict ingress to the documented Microsoft channel-adapter ranges and validate
 Bot Framework JWTs before crossing a required security boundary. Validate a real
 Teams reply; `titleId` alone is not end-to-end completion.

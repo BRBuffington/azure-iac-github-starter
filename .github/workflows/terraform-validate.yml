@@ -11,6 +11,7 @@ on:
       - "examples/cross-tenant-private-link-dns/**"
       - "examples/foundry-agent-teams/**"
       - ".github/scripts/test_foundry_agent_teams_options.py"
+      - ".github/scripts/test_foundry_agent_teams_bicep.py"
       - ".github/scripts/test_private_dns_option_separation.py"
       - "policy/**"
       - ".github/workflows/terraform-*.yml"
@@ -233,3 +234,52 @@ jobs:
       - name: terraform test (root contracts; no Azure calls)
         run: terraform test -no-color
         working-directory: examples/foundry-agent-teams/${{ matrix.option }}
+
+  validate-foundry-agent-teams-bicep:
+    name: validate-foundry-standard-private-bicep
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install pinned Bicep CLI
+        shell: bash
+        run: az bicep install --version v0.46.1
+
+      - name: Compile Bicep roots and parameters
+        shell: bash
+        working-directory: examples/foundry-agent-teams/standard-private-bicep
+        env:
+          AZURE_BICEP_CHECK_VERSION: "false"
+        run: |
+          set -euo pipefail
+          az bicep build --file main.bicep --stdout >/dev/null
+          az bicep build-params --file main.bicepparam --stdout >/dev/null
+
+      - name: Test compiled Bicep and publication contracts
+        shell: bash
+        env:
+          AZURE_BICEP_CHECK_VERSION: "false"
+        run: python .github/scripts/test_foundry_agent_teams_bicep.py
+
+      - name: Parse PowerShell scripts
+        shell: pwsh
+        run: |
+          $failed = $false
+          Get-ChildItem examples/foundry-agent-teams/standard-private-bicep/scripts -Recurse -Filter *.ps1 | ForEach-Object {
+            $tokens = $null
+            $errors = $null
+            [System.Management.Automation.Language.Parser]::ParseFile($_.FullName, [ref]$tokens, [ref]$errors) | Out-Null
+            if ($errors.Count -gt 0) {
+              $errors | ForEach-Object { Write-Error $_.Message }
+              $failed = $true
+            }
+          }
+          if ($failed) { exit 1 }

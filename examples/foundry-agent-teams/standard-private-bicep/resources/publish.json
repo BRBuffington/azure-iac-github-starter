@@ -1,0 +1,13 @@
+{
+  "agentDisplayName": "Replace Agent Display Name",
+  "botServiceArmId": "/subscriptions/replace/resourceGroups/replace/providers/Microsoft.BotService/botServices/replace",
+  "publishScope": "Shared",
+  "publishAsAutopilot": false,
+  "appVersion": "1.0.0",
+  "shortDescription": "A private Microsoft Foundry agent available in Teams and Microsoft 365.",
+  "fullDescription": "A private Microsoft Foundry Prompt Agent published through a governed client deployment.",
+  "developerName": "Replace Organization Name",
+  "developerWebsiteUrl": "https://example.com",
+  "privacyUrl": "https://example.com/privacy",
+  "termsOfUseUrl": "https://example.com/terms"
+}

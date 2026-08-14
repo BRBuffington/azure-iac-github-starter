@@ -1,2 +1,3 @@
-agent-handoff.parameters.json
-main.json
+foundation/main.json
+network/foundry-private-agent.json
+bot-service.json

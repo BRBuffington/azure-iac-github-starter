@@ -12,10 +12,9 @@ Choose one child root and copy only that root into the adopting repository.
   endpoints, and a private MCP endpoint. It is added and validated independently
   from the public root.
 - [`standard-private-bicep/`](standard-private-bicep/) is a parameterized Bicep
-  Standard Agent Setup for clients that keep this architecture in Bicep. Bicep
-  owns the network injection, BYOR connections/RBAC, capability host, private
-  endpoints, Bot Service, and Teams channel. Delegated PowerShell is limited to
-  the Prompt Agent and Microsoft 365 REST operations that ARM cannot represent.
+  Standard Agent Setup adapted directly from a working private publication
+  package. The original foundation and Step 1-4 script are preserved; only the
+  client parameter examples and Bicep-owned Bot Service handoff are adapted.
 
 The roots do not share modules, variables, or state. The two Terraform roots
 demonstrate this staged publication contract:
@@ -34,9 +33,8 @@ Terraform does not use `local-exec` or provisioners for data-plane operations.
 The repository definitions are authoritative, but Foundry does not watch Git;
 the workflow must reapply changed definitions.
 
-The Bicep root follows the same separation of control plane and data plane, but
-uses a delegated PowerShell publisher instead of the app-only OIDC workflow. Its
-README documents the two Bicep deployments around the agent-identity handoff.
+The Bicep root uses delegated PowerShell for the Foundry data-plane calls in
+Steps 1, 3, and 4. Step 2 remains Bicep-owned.
 
 ## References
 

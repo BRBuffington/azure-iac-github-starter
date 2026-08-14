@@ -1,13 +1,10 @@
 # Third-party notices
 
-This example is adapted from architecture and code patterns in the Microsoft
-Foundry samples repository:
+The Bicep foundation is adapted from the Microsoft Foundry samples repository:
 
 https://github.com/microsoft-foundry/foundry-samples/tree/main/infrastructure/infrastructure-setup-bicep/15-private-network-standard-agent-setup
 
-The upstream repository is licensed under the MIT License:
-
-MIT License
+The upstream repository is licensed under the MIT License.
 
 Copyright (c) 2025 Microsoft Corporation
 

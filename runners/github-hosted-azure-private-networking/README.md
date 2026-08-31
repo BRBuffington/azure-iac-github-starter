@@ -93,17 +93,15 @@ other endpoints remain denied until a named workflow operation justifies them.
    for the Terraform GitHub provider and `GH_TOKEN` for the REST bridge. The token is
    inherited by the process and is never a Terraform variable, output, or state value.
 
-## Discover GitHub input IDs
+## Verify GitHub runner options
 
-Use an organization owner identity and the same API version as the bridge:
+Terraform derives the organization `databaseId` and selected repository IDs from
+`github_organization` and `selected_repositories`. Use an organization owner identity
+and the same API version as the bridge to verify the image and machine size available
+to the target organization:
 
 ```bash
 ORG=example-org
-
-gh api graphql \
-  -f login="$ORG" \
-  -f query='query($login:String!){organization(login:$login){databaseId}}' \
-  --jq '.data.organization.databaseId'
 
 gh api -H 'X-GitHub-Api-Version: 2026-03-10' \
   "/orgs/$ORG/actions/hosted-runners/images/github-owned" \
@@ -112,21 +110,18 @@ gh api -H 'X-GitHub-Api-Version: 2026-03-10' \
 gh api -H 'X-GitHub-Api-Version: 2026-03-10' \
   "/orgs/$ORG/actions/hosted-runners/machine-sizes" \
   --jq '.machine_specs[] | [.id,.cpu_cores,.memory_gb,.storage_gb] | @tsv'
-
-gh api -H 'X-GitHub-Api-Version: 2026-03-10' \
-  "/repos/$ORG/example-repo" --jq '.id'
 ```
 
-Use the organization `databaseId` as `github_organization_database_id`. Runner
-image IDs, sizes, and repository IDs are organization-specific API values; do not
-copy the placeholders from `terraform.tfvars.example` into a real plan.
+This root defaults to the GitHub-owned `ubuntu-latest` image, `4-core` machine size,
+and a maximum of 10 runners. Override them when the target organization requires a
+different available image, size, or concurrency limit.
 
 ## Configure one environment
 
 1. Copy this root into the environment's deployment repository.
 2. Copy `terraform.tfvars.example` to a config file named
    `<scope>-<region>-<env>.tfvars` and replace every placeholder.
-3. Set `selected_repository_ids` and fully qualified `selected_workflows`. Every
+3. Set `selected_repositories` and fully qualified `selected_workflows`. Every
    workflow entry requires `ORG/REPO/.github/workflows/FILE@REF`.
 4. Set `maximum_runners`, then size the delegated subnet for that concurrency plus
    GitHub's 30 percent address buffer and Azure's five reserved addresses. The root

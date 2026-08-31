@@ -15,6 +15,13 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-08-31 — Organization APN derives numeric GitHub identifiers
+The organization-scoped APN root accepts the GitHub organization login and repository
+names, then derives the organization `databaseId` and repository IDs through the pinned
+GitHub provider. The runner image, image source, machine size, and concurrency retain
+documented defaults with explicit overrides. Enterprise-scoped APN remains a separate
+composition because it requires an enterprise `databaseId` and enterprise runner group.
+
 ### 2026-08-31 — Private runner delivery has two supported ownership models
 Private-endpoint delivery can use self-hosted Container Apps job runners or
 GitHub-hosted larger runners attached through Azure Private Networking. Keep each

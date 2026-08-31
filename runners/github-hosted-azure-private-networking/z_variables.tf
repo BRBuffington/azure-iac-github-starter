@@ -133,23 +133,15 @@ variable "github_organization" {
   }
 }
 
-variable "github_organization_database_id" {
-  description = "Organization databaseId returned by the GitHub GraphQL API."
-  type        = string
+variable "selected_repositories" {
+  description = "Repository names in github_organization allowed to schedule the runner group."
+  type        = set(string)
 
   validation {
-    condition     = can(regex("^[0-9]+$", var.github_organization_database_id))
-    error_message = "github_organization_database_id must contain only digits."
-  }
-}
-
-variable "selected_repository_ids" {
-  description = "Numeric repository IDs allowed to schedule the runner group."
-  type        = set(number)
-
-  validation {
-    condition     = length(var.selected_repository_ids) > 0 && alltrue([for id in var.selected_repository_ids : id > 0])
-    error_message = "selected_repository_ids must contain at least one positive repository ID."
+    condition = length(var.selected_repositories) > 0 && alltrue([
+      for name in var.selected_repositories : can(regex("^[A-Za-z0-9_.-]{1,100}$", name))
+    ])
+    error_message = "selected_repositories must contain at least one valid repository name without the organization prefix."
   }
 }
 
@@ -167,8 +159,9 @@ variable "selected_workflows" {
 }
 
 variable "runner_image_id" {
-  description = "Image ID returned by the GitHub hosted-runners images API."
+  description = "GitHub-hosted runner image ID. Defaults to GitHub's latest stable Ubuntu image."
   type        = string
+  default     = "ubuntu-latest"
 
   validation {
     condition     = trimspace(var.runner_image_id) != ""

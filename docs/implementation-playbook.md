@@ -31,7 +31,8 @@ is recorded and its rollback has been exercised.
 | MCP CI contract | [`.github/workflows/read-only-mcp-test.yml`](../.github/workflows/read-only-mcp-test.yml) |
 | Optional multi-model review | [`.github/workflows/llm-council.yml`](../.github/workflows/llm-council.yml) |
 | Council implementation and controls | [`docs/llm-council.md`](llm-council.md) |
-| Private runner pattern | [`runners/README.md`](../runners/README.md) |
+| Private runner decision guide | [`runners/README.md`](../runners/README.md) |
+| GitHub-hosted APN runner template | [`runners/github-hosted-azure-private-networking/`](../runners/github-hosted-azure-private-networking/) |
 
 ## Phase 0 - Establish deterministic delivery
 
@@ -61,12 +62,45 @@ credentials must be constrained to the repository and the intended environment.
 Give the plan principal only the read permissions required for Azure and state;
 give the apply principal only the write scope required by the target layer.
 
-Azure Container Apps job runners cannot run Docker commands inside the runner
-container. Build Terraform, Python, and other common tools into the hardened image
-or install pinned native packages. The starter deliberately runs Checkov as a
-pinned Python CLI instead of a Docker action.
+For self-hosted Container Apps job runners, build Terraform, Python, and other common
+tools into the hardened image or install pinned native packages. Container Apps jobs
+cannot run Docker commands inside the runner container, so the starter deliberately
+runs Checkov as a pinned Python CLI instead of a Docker action.
 
-### 0.2 Configure private state without creating a second state scheme
+### 0.2 Select the private runner ownership model
+
+Use the [runner decision guide](../runners/README.md) to select one private execution
+pattern. Do not combine both patterns into one Terraform state merely to preserve an
+option.
+
+For self-hosted execution, deploy the Container Apps job runner through its own
+environment stack, register it in a restricted runner group, and validate the hardened
+image and private DNS path.
+
+For GitHub-hosted execution, copy the
+[APN runner root](../runners/github-hosted-azure-private-networking/) once per real
+environment. Provide the existing environment resource group and route table, runner
+and dependency CIDRs, organization database ID, repository and workflow IDs, approved
+image and size, concurrency ceiling, and only the private dependency endpoints justified
+by named workflow operations. Keep the dependency map empty until the network path,
+data-plane role, owner, positive test, and negative test are approved together.
+
+Run the root's formatting, backend-free initialization, validation, Terraform mock
+tests, PowerShell REST-bridge contract tests, and fail-closed Checkov scan. Then inspect
+a protected pipeline plan. The template is complete without a backend or live apply;
+the consuming environment stack owns state and deployment.
+
+**Exit evidence:** selected ownership model, runner entitlement and region, subnet
+capacity including GitHub's 30 percent buffer, private DNS and route evidence, selected
+repositories and workflows, conditioned OIDC subjects, least-privilege roles, green
+source tests, and one allowed plus one denied scheduling/network test.
+
+**Rollback:** stop scheduling the group and revoke its OIDC trusts first. For APN,
+destroy only the environment root after reviewing the plan and preserving audit/network
+evidence. Do not delete shared route tables, Firewall policy, DNS, Private Endpoints,
+backends, identities, or log destinations from the runner state.
+
+### 0.3 Configure private state without creating a second state scheme
 
 Copy [`infra/backend.hcl.example`](../infra/backend.hcl.example) locally and use
 one nested key per config:
@@ -82,7 +116,7 @@ run the attended [`state-migrate.yml`](../.github/workflows/state-migrate.yml)
 workflow before the first CD plan. Confirm the source and destination blobs,
 state serial, lineage, resource count, and a zero-change plan after migration.
 
-### 0.3 Prove the baseline locally and in a pull request
+### 0.4 Prove the baseline locally and in a pull request
 
 ```bash
 terraform -chdir=infra fmt -check -recursive

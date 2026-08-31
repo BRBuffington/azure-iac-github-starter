@@ -99,4 +99,34 @@ locals {
   runner_subnet_prefix_length    = tonumber(split("/", var.runner_subnet_cidr)[1])
   runner_subnet_usable_addresses = pow(2, 32 - local.runner_subnet_prefix_length) - 5
   required_runner_addresses      = ceil(var.maximum_runners * 1.3)
+
+  runner_subnet_first_octets     = [for octet in split(".", cidrhost(var.runner_subnet_cidr, 0)) : tonumber(octet)]
+  runner_subnet_last_octets      = [for octet in split(".", cidrhost(var.runner_subnet_cidr, -1)) : tonumber(octet)]
+  dependency_subnet_first_octets = [for octet in split(".", cidrhost(var.dependency_subnet_cidr, 0)) : tonumber(octet)]
+  dependency_subnet_last_octets  = [for octet in split(".", cidrhost(var.dependency_subnet_cidr, -1)) : tonumber(octet)]
+
+  runner_subnet_first = sum([
+    local.runner_subnet_first_octets[0] * 16777216,
+    local.runner_subnet_first_octets[1] * 65536,
+    local.runner_subnet_first_octets[2] * 256,
+    local.runner_subnet_first_octets[3],
+  ])
+  runner_subnet_last = sum([
+    local.runner_subnet_last_octets[0] * 16777216,
+    local.runner_subnet_last_octets[1] * 65536,
+    local.runner_subnet_last_octets[2] * 256,
+    local.runner_subnet_last_octets[3],
+  ])
+  dependency_subnet_first = sum([
+    local.dependency_subnet_first_octets[0] * 16777216,
+    local.dependency_subnet_first_octets[1] * 65536,
+    local.dependency_subnet_first_octets[2] * 256,
+    local.dependency_subnet_first_octets[3],
+  ])
+  dependency_subnet_last = sum([
+    local.dependency_subnet_last_octets[0] * 16777216,
+    local.dependency_subnet_last_octets[1] * 65536,
+    local.dependency_subnet_last_octets[2] * 256,
+    local.dependency_subnet_last_octets[3],
+  ])
 }

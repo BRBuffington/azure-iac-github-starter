@@ -98,17 +98,17 @@ run "reject_insufficient_runner_subnet" {
     maximum_runners    = 10
   }
 
-  expect_failures = [check.subnet_capacity]
+  expect_failures = [terraform_data.configuration_guard]
 }
 
-run "reject_shared_runner_and_dependency_subnet" {
+run "reject_overlapping_runner_and_dependency_subnets" {
   command = plan
 
   variables {
-    dependency_subnet_cidr = "10.40.0.0/24"
+    dependency_subnet_cidr = "10.40.0.128/25"
   }
 
-  expect_failures = [check.subnet_separation]
+  expect_failures = [terraform_data.configuration_guard]
 }
 
 run "reject_version_on_noncustom_image" {
@@ -118,5 +118,5 @@ run "reject_version_on_noncustom_image" {
     runner_image_version = "2026.08.1"
   }
 
-  expect_failures = [check.custom_image_version]
+  expect_failures = [terraform_data.configuration_guard]
 }

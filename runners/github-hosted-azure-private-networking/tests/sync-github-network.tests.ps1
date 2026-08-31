@@ -119,6 +119,27 @@ foreach ($foreignConfiguration in @(
     Assert-Equal -Actual $driftCalls.Count -Expected 1 -Message "Ownership-drift path call count"
 }
 
+Set-TestEnvironment -Mode Ensure
+$malformedCalls = [System.Collections.Generic.List[object]]::new()
+$malformedApi = {
+    param($Method, $Path, $Body, $AllowNotFound)
+    $malformedCalls.Add([pscustomobject]@{ Method = $Method; Path = $Path; Body = $Body; AllowNotFound = $AllowNotFound })
+    return [pscustomobject]@{ total_count = 0 }
+}
+
+$malformedRejected = $false
+try {
+    Invoke-ApnMain -ApiInvoker $malformedApi
+}
+catch {
+    $malformedRejected = $_.Exception.Message -like "*omitted required property 'network_configurations'.*"
+}
+
+if (-not $malformedRejected) {
+    throw "A malformed GitHub list response must fail closed before creation."
+}
+Assert-Equal -Actual $malformedCalls.Count -Expected 1 -Message "Malformed-response path call count"
+
 Set-TestEnvironment -Mode Remove
 $removeCalls = [System.Collections.Generic.List[object]]::new()
 $removeApi = {

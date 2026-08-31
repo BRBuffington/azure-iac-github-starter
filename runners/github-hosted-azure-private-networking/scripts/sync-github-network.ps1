@@ -31,6 +31,24 @@ function Get-ObjectPropertyValue {
     return $property.Value
 }
 
+function Get-RequiredObjectProperty {
+    param(
+        [AllowNull()][object] $InputObject,
+        [Parameter(Mandatory)][string] $Name
+    )
+
+    if ($null -eq $InputObject) {
+        throw "GitHub API response omitted required property '$Name'."
+    }
+
+    $property = $InputObject.PSObject.Properties[$Name]
+    if ($null -eq $property -or $null -eq $property.Value) {
+        throw "GitHub API response omitted required property '$Name'."
+    }
+
+    return $property
+}
+
 function Invoke-GitHubApi {
     param(
         [Parameter(Mandatory)][ValidateSet("GET", "POST", "PATCH", "DELETE")][string] $Method,
@@ -97,7 +115,7 @@ function Get-NetworkConfigurations {
     do {
         $path = "/orgs/$OrganizationPath/settings/network-configurations?per_page=100&page=$page"
         $response = & $ApiInvoker "GET" $path $null $false
-        $pageItems = @(Get-ObjectPropertyValue -InputObject $response -Name "network_configurations")
+        $pageItems = @((Get-RequiredObjectProperty -InputObject $response -Name "network_configurations").Value)
         $configurations += $pageItems
         $page++
     } while ($pageItems.Count -eq 100)
@@ -138,7 +156,7 @@ function Invoke-ApnMain {
     $organizationPath = [Uri]::EscapeDataString($organization)
     $configurations = @(Get-NetworkConfigurations -ApiInvoker $ApiInvoker -OrganizationPath $organizationPath)
     $matchingConfigurations = @($configurations | Where-Object {
-        (Get-ObjectPropertyValue -InputObject $_ -Name "name") -ceq $configurationName
+        (Get-RequiredObjectProperty -InputObject $_ -Name "name").Value -ceq $configurationName
     })
 
     if ($matchingConfigurations.Count -gt 1) {
@@ -168,10 +186,10 @@ function Invoke-ApnMain {
 
         $runnerGroup = & $ApiInvoker "GET" $runnerGroupPath $null $false
         $runnerGroupNetworkConfigurationId = Get-ObjectPropertyValue -InputObject $runnerGroup -Name "network_configuration_id"
-        $configurationId = Get-ObjectPropertyValue -InputObject $configuration -Name "id"
+        $configurationId = (Get-RequiredObjectProperty -InputObject $configuration -Name "id").Value
         if ($runnerGroupNetworkConfigurationId -ne $configurationId) {
             $runnerGroupBody = @{
-                name                     = Get-ObjectPropertyValue -InputObject $runnerGroup -Name "name"
+                name                     = (Get-RequiredObjectProperty -InputObject $runnerGroup -Name "name").Value
                 network_configuration_id = $configurationId
             }
             $null = & $ApiInvoker "PATCH" $runnerGroupPath $runnerGroupBody $false
@@ -194,11 +212,11 @@ function Invoke-ApnMain {
     }
 
     $runnerGroup = & $ApiInvoker "GET" $runnerGroupPath $null $true
-    $configurationId = Get-ObjectPropertyValue -InputObject $configuration -Name "id"
+    $configurationId = (Get-RequiredObjectProperty -InputObject $configuration -Name "id").Value
     $runnerGroupNetworkConfigurationId = Get-ObjectPropertyValue -InputObject $runnerGroup -Name "network_configuration_id"
     if ($null -ne $runnerGroup -and $runnerGroupNetworkConfigurationId -eq $configurationId) {
         $runnerGroupBody = @{
-            name                     = Get-ObjectPropertyValue -InputObject $runnerGroup -Name "name"
+            name                     = (Get-RequiredObjectProperty -InputObject $runnerGroup -Name "name").Value
             network_configuration_id = $null
         }
         $null = & $ApiInvoker "PATCH" $runnerGroupPath $runnerGroupBody $false

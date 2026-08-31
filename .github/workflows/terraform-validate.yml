@@ -1,5 +1,5 @@
 # PR gate: format, validate, IaC security scan, and a speculative plan.
-# Runs on every pull request that touches infra/ or a validated example. Read-only
+# Runs on every pull request that touches infra/ or a validated reference root. Read-only
 # — no apply, no state writes beyond a speculative plan (which the plan identity
 # is read-scoped for).
 name: terraform-validate
@@ -8,6 +8,7 @@ on:
   pull_request:
     paths:
       - "infra/**"
+      - "runners/github-hosted-azure-private-networking/**"
       - "examples/cross-tenant-private-link-dns/**"
       - "examples/foundry-agent-teams/**"
       - ".github/scripts/test_foundry_agent_teams_options.py"
@@ -177,6 +178,56 @@ jobs:
       - name: terraform test (mock providers; no Azure calls)
         run: terraform test -no-color
         working-directory: examples/cross-tenant-private-link-dns/${{ matrix.option }}
+
+  validate-github-hosted-apn-runner:
+    name: validate-github-hosted-apn-runner
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    defaults:
+      run:
+        shell: bash
+        working-directory: runners/github-hosted-azure-private-networking
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_wrapper: false
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: terraform fmt -check
+        run: terraform fmt -check -recursive
+
+      - name: Install Checkov (pinned)
+        run: python -m pip install --disable-pip-version-check checkov==3.3.8
+
+      - name: Test fail-closed Checkov gate
+        run: python "${GITHUB_WORKSPACE}/.github/scripts/test_checkov_fail_closed.py"
+
+      - name: IaC security scan (Checkov)
+        run: >-
+          python "${GITHUB_WORKSPACE}/.github/scripts/checkov_fail_closed.py"
+          --directory "${GITHUB_WORKSPACE}/runners/github-hosted-azure-private-networking"
+
+      - name: terraform init (no backend)
+        run: terraform init -input=false -backend=false
+
+      - name: terraform validate
+        run: terraform validate -no-color
+
+      - name: terraform test (mock providers; no Azure or GitHub calls)
+        run: terraform test -no-color
+
+      - name: Test GitHub network REST bridge
+        shell: pwsh
+        run: ./tests/sync-github-network.tests.ps1
 
   validate-foundry-agent-teams-option:
     name: validate-foundry-${{ matrix.option }}

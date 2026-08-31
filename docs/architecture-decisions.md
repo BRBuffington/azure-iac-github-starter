@@ -5,16 +5,22 @@ were converged by an independent multi-model Azure architecture review for a reg
 (PHI / HIPAA / HITRUST) health-system landing zone. Re-verify every citation against
 your own requirements before adopting.
 
-## 1. Build runners — self-hosted, in-VNet, ephemeral
+## 1. Build runners — private, ephemeral, explicit ownership boundary
 
-**Decision:** Run plan/apply on **self-hosted runners inside the landing-zone VNet**,
-ephemeral and scale-to-zero (Azure Container Apps jobs are the cleanest fit).
-GitHub-hosted runners cannot reach private-endpoint-only state/Key Vault/storage.
+**Decision:** Run private plan/apply jobs on ephemeral runners with network reachability
+to the matching environment. Use **self-hosted Container Apps job runners** when the
+organization must own the runner image and tools. Use **GitHub-hosted larger runners
+with Azure Private Networking** when GitHub should own the runner lifecycle and the
+required plan, region, image, and size are available. Both patterns keep untrusted
+pull-request jobs away from privileged private dependencies and use protected OIDC
+jobs for plan/apply.
 
 - Self-hosted runners reaching private VNet resources, scale-to-zero:
   https://learn.microsoft.com/azure/container-apps/tutorial-ci-cd-runners-jobs
-- GitHub-hosted vs self-hosted runner properties:
-  https://docs.github.com/actions/concepts/runners/self-hosted-runners
+- GitHub-hosted runners with Azure Private Networking:
+  https://docs.github.com/en/enterprise-cloud@latest/organizations/managing-organization-settings/configuring-private-networking-for-hosted-compute-products/configuring-private-networking-for-github-hosted-runners-in-your-organization
+- Client-agnostic APN Terraform root:
+  ../runners/github-hosted-azure-private-networking/
 
 ## 2. Remote state — Azure Storage, Entra-auth, private-endpoint only
 

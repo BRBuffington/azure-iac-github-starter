@@ -1,0 +1,30 @@
+subscription_id                 = "00000000-0000-0000-0000-000000000000"
+resource_group_name             = "rg-example-eus-prd"
+location                        = "eastus"
+scope                           = "example"
+region_alias                    = "eus"
+environment                     = "prd"
+vnet_address_space              = "10.40.0.0/22"
+runner_subnet_cidr              = "10.40.0.0/24"
+dependency_subnet_cidr          = "10.40.1.0/24"
+route_table_resource_id         = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-connectivity-eus-prd/providers/Microsoft.Network/routeTables/rt-runners-eus-prd"
+dns_servers                     = ["10.0.0.4", "10.0.0.5"]
+
+approved_private_dependencies = {}
+
+github_organization             = "example-org"
+github_organization_database_id = "12345678"
+selected_repository_ids         = [123456789]
+selected_workflows = [
+  "example-org/example-repo/.github/workflows/terraform-cd.yml@refs/heads/main",
+]
+runner_image_id     = "2306"
+runner_image_source = "github"
+runner_size         = "4-core"
+maximum_runners     = 10
+deployed_by_repo    = "example-org/azure-platform"
+
+tags = {
+  CostCenter = "replace-me"
+  Owner      = "replace-me"
+}

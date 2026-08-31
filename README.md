@@ -32,8 +32,9 @@ names, and you have a working, opinionated pipeline on day one.
 | `examples/cross-tenant-private-link-dns/` | Catalog of two independent client-agnostic Terraform roots: standard resolution contexts and prefixed backing zones. Each uses readable scalar/list inputs and local resource maps for manual-approval cross-tenant Storage DFS/Blob and Azure SQL Private Endpoints. |
 | `examples/foundry-agent-teams/` | Three independent Microsoft Foundry Prompt Agent roots: Terraform public and Standard/BYO private patterns, plus a client-parameterized copy of a working Bicep private-publication package and its Step 1-4 script. |
 | `.github/workflows/foundry-agent-data-plane.yml` | Human-gated OIDC workflow that versions/promotes the checked-in Toolbox, creates the Prompt Agent, emits the Terraform principal-ID handoff, and publishes to Microsoft 365 only after Bot Service apply. |
-| `infra/locals.tf` | **Provenance tags** — `DeployedByRepo` (from `github.repository`) on every resource via `local.common_tags`, plus a `LastApplied` stamp the CD job writes post-apply. Lets an agent (or you, weeks later) trace what deployed a resource and when. |
-| `runners/README.md` | The **self-hosted, in-VNet, ephemeral runner** pattern (the only way to reach private-endpoint state). |
+| `infra/locals.tf` | **Provenance tags** — `DeployedByRepo` (from `github.repository`) on every resource via `local.common_tags`, plus a `LastApplied` stamp the CD job writes post-apply. Lets an agent — or a human weeks later — trace what deployed a resource and when. |
+| `runners/README.md` | Decision guide for private, ephemeral runners: self-hosted Container Apps jobs or GitHub-hosted larger runners with Azure Private Networking. |
+| `runners/github-hosted-azure-private-networking/` | Client-agnostic Terraform root for one environment-specific GitHub-hosted larger runner pool attached to a delegated Azure subnet. |
 | `.vscode/mcp.json.example` | Agent config: the Terraform + Azure MCP servers for the VS Code + GitHub Copilot authoring loop. |
 | `.github/copilot-instructions.md` | Repo-scoped Copilot guidance so the agent writes Terraform that matches these conventions. |
 | `.github/instructions/terraform.instructions.md` | Path-scoped Terraform rules for modules, state, identity, security, and required evidence. |
@@ -51,9 +52,10 @@ names, and you have a working, opinionated pipeline on day one.
 
 ## The decisions this repo encodes (one-liners — full rationale + citations in `docs/`)
 
-1. **Runners: self-hosted, in-VNet, ephemeral.** Once state / Key Vault / storage are
-   private-endpoint-only, GitHub-hosted runners cannot reach them. Container Apps jobs
-   with scale-to-zero are the cleanest fit.
+1. **Runners: private and ephemeral, with an explicit ownership choice.** Use
+   self-hosted Container Apps jobs when the organization must own the runner image and
+   tools. Use GitHub-hosted larger runners with Azure Private Networking when GitHub
+   should own runner lifecycle and the required plan and region are available.
 2. **Remote state: Azure Storage, Entra-auth, no keys, private-endpoint only**, with
    versioning + native blob-lease locking, one state file **per layer per environment**.
    Not a cross-cloud object store.
@@ -94,7 +96,7 @@ cp infra/configs/example-eus-dev.tfvars infra/configs/<scope>-<region>-<env>.tfv
 ```
 
 See `docs/architecture-decisions.md` for the why, and `runners/README.md` for the
-self-hosted runner setup that makes private-endpoint state reachable.
+two supported private-runner patterns.
 Use `docs/implementation-playbook.md` for the phase-by-phase build and validation
 sequence, including the tested read-only MCP and agent-review examples.
 

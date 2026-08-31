@@ -51,7 +51,7 @@ resource "azapi_resource" "github_network_settings" {
 
   body = {
     properties = {
-      businessId = var.github_organization_database_id
+      businessId = data.github_organization.this.id
       subnetId   = module.runner_vnet.subnets["runners"].resource_id
     }
   }

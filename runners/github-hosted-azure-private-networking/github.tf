@@ -1,7 +1,18 @@
+data "github_organization" "this" {
+  name         = var.github_organization
+  summary_only = true
+}
+
+data "github_repository" "selected" {
+  for_each = var.selected_repositories
+
+  full_name = "${var.github_organization}/${each.value}"
+}
+
 resource "github_actions_runner_group" "this" {
   name                       = local.names.runner_group
   visibility                 = "selected"
-  selected_repository_ids    = var.selected_repository_ids
+  selected_repository_ids    = toset([for repository in data.github_repository.selected : repository.repo_id])
   restricted_to_workflows    = true
   selected_workflows         = sort(tolist(var.selected_workflows))
   allows_public_repositories = false

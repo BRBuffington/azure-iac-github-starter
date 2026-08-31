@@ -11,6 +11,20 @@ override_data {
   }
 }
 
+override_data {
+  target = data.github_organization.this
+  values = {
+    id = "12345678"
+  }
+}
+
+override_data {
+  target = data.github_repository.selected
+  values = {
+    repo_id = 123456789
+  }
+}
+
 variables {
   subscription_id         = "00000000-0000-0000-0000-000000000000"
   resource_group_name     = "rg-example-eus-prd"
@@ -32,12 +46,10 @@ variables {
       destination_port_ranges      = ["443"]
     }
   }
-  github_organization             = "example-org"
-  github_organization_database_id = "12345678"
-  selected_repository_ids         = [123456789]
-  selected_workflows              = ["example-org/example-repo/.github/workflows/terraform-cd.yml@main"]
-  maximum_runners                 = 10
-  deployed_by_repo                = "example-org/azure-platform"
+  github_organization  = "example-org"
+  selected_repositories = ["example-repo"]
+  selected_workflows    = ["example-org/example-repo/.github/workflows/terraform-cd.yml@main"]
+  deployed_by_repo      = "example-org/azure-platform"
 }
 
 run "valid_private_runner_configuration" {
@@ -70,7 +82,12 @@ run "valid_private_runner_configuration" {
 
   assert {
     condition     = azapi_resource.github_network_settings.body.properties.businessId == "12345678"
-    error_message = "The NetworkSettings businessId must use the organization database ID."
+    error_message = "The NetworkSettings businessId must use the organization data-source ID."
+  }
+
+  assert {
+    condition     = github_actions_runner_group.this.selected_repository_ids == toset([123456789])
+    error_message = "The runner group must derive numeric repository IDs from selected repository names."
   }
 
   assert {

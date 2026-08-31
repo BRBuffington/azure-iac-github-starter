@@ -82,8 +82,10 @@ For GitHub-hosted execution, copy the
 environment. Provide the existing environment resource group and route table, runner
 and dependency CIDRs, organization database ID, repository and workflow IDs, approved
 image and size, concurrency ceiling, and only the private dependency endpoints justified
-by named workflow operations. Keep the dependency map empty until the network path,
-data-plane role, owner, positive test, and negative test are approved together.
+by named workflow operations. Register `GitHub.Network` in the subscription bootstrap;
+the copied environment root must not own that subscription-wide singleton. Keep the
+dependency map empty until the network path, data-plane role, owner, positive test, and
+negative test are approved together.
 
 Run the root's formatting, backend-free initialization, validation, Terraform mock
 tests, PowerShell REST-bridge contract tests, and fail-closed Checkov scan. Then inspect

@@ -112,9 +112,9 @@ gh api -H 'X-GitHub-Api-Version: 2026-03-10' \
   --jq '.machine_specs[] | [.id,.cpu_cores,.memory_gb,.storage_gb] | @tsv'
 ```
 
-The documented defaults are the GitHub-owned `ubuntu-latest` image, `4-core` machine
-size, and a maximum of 10 runners. Override them when the target organization requires
-a different available image, size, or concurrency limit.
+This root defaults to the GitHub-owned `ubuntu-latest` image, `4-core` machine size,
+and a maximum of 10 runners. Override them when the target organization requires a
+different available image, size, or concurrency limit.
 
 ## Configure one environment
 

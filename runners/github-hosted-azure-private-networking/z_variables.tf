@@ -167,8 +167,9 @@ variable "selected_workflows" {
 }
 
 variable "runner_image_id" {
-  description = "Image ID returned by the GitHub hosted-runners images API."
+  description = "GitHub-hosted runner image ID. Defaults to GitHub's latest stable Ubuntu image."
   type        = string
+  default     = "ubuntu-latest"
 
   validation {
     condition     = trimspace(var.runner_image_id) != ""

@@ -36,7 +36,6 @@ variables {
   github_organization_database_id = "12345678"
   selected_repository_ids         = [123456789]
   selected_workflows              = ["example-org/example-repo/.github/workflows/terraform-cd.yml@main"]
-  runner_image_id                 = "2306"
   maximum_runners                 = 10
   deployed_by_repo                = "example-org/azure-platform"
 }
@@ -77,6 +76,11 @@ run "valid_private_runner_configuration" {
   assert {
     condition     = github_actions_runner_group.this.visibility == "selected" && github_actions_runner_group.this.restricted_to_workflows && !github_actions_runner_group.this.allows_public_repositories
     error_message = "The runner group must be restricted to selected repositories and workflows, with public repositories denied."
+  }
+
+  assert {
+    condition     = github_actions_hosted_runner.this.image[0].id == "ubuntu-latest" && github_actions_hosted_runner.this.image[0].source == "github"
+    error_message = "The default hosted runner must use GitHub's latest stable Ubuntu image."
   }
 
   assert {

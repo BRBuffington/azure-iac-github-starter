@@ -46,7 +46,7 @@ variables {
       destination_port_ranges      = ["443"]
     }
   }
-  github_organization  = "example-org"
+  github_organization   = "example-org"
   selected_repositories = ["example-repo"]
   selected_workflows    = ["example-org/example-repo/.github/workflows/terraform-cd.yml@main"]
   deployed_by_repo      = "example-org/azure-platform"

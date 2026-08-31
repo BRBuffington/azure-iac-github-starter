@@ -13,6 +13,24 @@ function Get-RequiredEnvironmentValue {
     return $value.Trim()
 }
 
+function Get-ObjectPropertyValue {
+    param(
+        [AllowNull()][object] $InputObject,
+        [Parameter(Mandatory)][string] $Name
+    )
+
+    if ($null -eq $InputObject) {
+        return $null
+    }
+
+    $property = $InputObject.PSObject.Properties[$Name]
+    if ($null -eq $property) {
+        return $null
+    }
+
+    return $property.Value
+}
+
 function Invoke-GitHubApi {
     param(
         [Parameter(Mandatory)][ValidateSet("GET", "POST", "PATCH", "DELETE")][string] $Method,
@@ -79,7 +97,7 @@ function Get-NetworkConfigurations {
     do {
         $path = "/orgs/$OrganizationPath/settings/network-configurations?per_page=100&page=$page"
         $response = & $ApiInvoker "GET" $path $null $false
-        $pageItems = @($response.network_configurations)
+        $pageItems = @(Get-ObjectPropertyValue -InputObject $response -Name "network_configurations")
         $configurations += $pageItems
         $page++
     } while ($pageItems.Count -eq 100)
@@ -119,7 +137,9 @@ function Invoke-ApnMain {
 
     $organizationPath = [Uri]::EscapeDataString($organization)
     $configurations = @(Get-NetworkConfigurations -ApiInvoker $ApiInvoker -OrganizationPath $organizationPath)
-    $matchingConfigurations = @($configurations | Where-Object { $_.name -ceq $configurationName })
+    $matchingConfigurations = @($configurations | Where-Object {
+        (Get-ObjectPropertyValue -InputObject $_ -Name "name") -ceq $configurationName
+    })
 
     if ($matchingConfigurations.Count -gt 1) {
         throw "More than one network configuration is named '$configurationName'."
@@ -139,8 +159,9 @@ function Invoke-ApnMain {
             $configuration = & $ApiInvoker "POST" "/orgs/$organizationPath/settings/network-configurations" $configurationBody $false
         }
         else {
-            $settingsIds = @($configuration.network_settings_ids)
-            $matchesDesiredState = $configuration.compute_service -eq "actions" -and
+            $settingsIds = @(Get-ObjectPropertyValue -InputObject $configuration -Name "network_settings_ids")
+            $computeService = Get-ObjectPropertyValue -InputObject $configuration -Name "compute_service"
+            $matchesDesiredState = $computeService -eq "actions" -and
                 $settingsIds.Count -eq 1 -and $settingsIds[0] -eq $networkSettingsId
 
             if (-not $matchesDesiredState) {
@@ -150,10 +171,12 @@ function Invoke-ApnMain {
         }
 
         $runnerGroup = & $ApiInvoker "GET" $runnerGroupPath $null $false
-        if ($runnerGroup.network_configuration_id -ne $configuration.id) {
+        $runnerGroupNetworkConfigurationId = Get-ObjectPropertyValue -InputObject $runnerGroup -Name "network_configuration_id"
+        $configurationId = Get-ObjectPropertyValue -InputObject $configuration -Name "id"
+        if ($runnerGroupNetworkConfigurationId -ne $configurationId) {
             $runnerGroupBody = @{
-                name                     = $runnerGroup.name
-                network_configuration_id = $configuration.id
+                name                     = Get-ObjectPropertyValue -InputObject $runnerGroup -Name "name"
+                network_configuration_id = $configurationId
             }
             $null = & $ApiInvoker "PATCH" $runnerGroupPath $runnerGroupBody $false
         }
@@ -166,24 +189,26 @@ function Invoke-ApnMain {
         Write-Output "Network configuration '$configurationName' is already absent."
         return
     }
-    if ($configuration.compute_service -ne "actions") {
+    if ((Get-ObjectPropertyValue -InputObject $configuration -Name "compute_service") -ne "actions") {
         throw "Refusing to remove '$configurationName' because its compute service is not actions."
     }
-    $configurationSettingsIds = @($configuration.network_settings_ids)
+    $configurationSettingsIds = @(Get-ObjectPropertyValue -InputObject $configuration -Name "network_settings_ids")
     if ($configurationSettingsIds.Count -ne 1 -or $configurationSettingsIds[0] -ne $networkSettingsId) {
         throw "Refusing to remove '$configurationName' because it no longer references this state's NetworkSettings ID."
     }
 
     $runnerGroup = & $ApiInvoker "GET" $runnerGroupPath $null $true
-    if ($null -ne $runnerGroup -and $runnerGroup.network_configuration_id -eq $configuration.id) {
+    $configurationId = Get-ObjectPropertyValue -InputObject $configuration -Name "id"
+    $runnerGroupNetworkConfigurationId = Get-ObjectPropertyValue -InputObject $runnerGroup -Name "network_configuration_id"
+    if ($null -ne $runnerGroup -and $runnerGroupNetworkConfigurationId -eq $configurationId) {
         $runnerGroupBody = @{
-            name                     = $runnerGroup.name
+            name                     = Get-ObjectPropertyValue -InputObject $runnerGroup -Name "name"
             network_configuration_id = $null
         }
         $null = & $ApiInvoker "PATCH" $runnerGroupPath $runnerGroupBody $false
     }
 
-    $configurationIdPath = [Uri]::EscapeDataString([string]$configuration.id)
+    $configurationIdPath = [Uri]::EscapeDataString([string]$configurationId)
     $null = & $ApiInvoker "DELETE" "/orgs/$organizationPath/settings/network-configurations/$configurationIdPath" $null $false
     Write-Output "Removed network configuration '$configurationName'."
 }

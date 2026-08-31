@@ -22,7 +22,6 @@ nonproduction and production in one state or select between them at runtime.
 
 | Plane | Managed resource or operation |
 |---|---|
-| Azure subscription | Registration of `GitHub.Network` |
 | Azure network | Two Azure Verified Module NSGs and one AVM VNet |
 | Runner subnet | Dedicated subnet delegated to `GitHub.Network/networkSettings`, with Azure default outbound access disabled |
 | Dependency subnet | Separate nondelegated subnet for approved Private Endpoints, with PE network policies enabled |
@@ -71,23 +70,26 @@ other endpoints remain denied until a named workflow operation justifies them.
 
 1. Confirm GitHub plan entitlement, organization ownership, region support, data
    residency, larger-runner quota, and the requested machine image and size.
-2. Provide an existing resource group and a route table in the same environment
+2. Register `GitHub.Network` through the subscription bootstrap stack. Provider
+   registration is subscription-wide and must not be owned by this copied
+   per-environment root.
+3. Provide an existing resource group and a route table in the same environment
    subscription. The route table must send Internet traffic to the approved egress
    control. If policy requires Private Endpoint inspection, configure PE network
    policies and effective specific routes; a `0.0.0.0/0` route does not override a
    Private Endpoint route by itself.
-3. Create approved Private Endpoints and private DNS in their owning stacks. Record
+4. Create approved Private Endpoints and private DNS in their owning stacks. Record
    their exact addresses before populating `approved_private_dependencies`.
-4. Give the Azure apply identity the scoped rights required to register
-   `GitHub.Network` and manage the resources in this root. Keep plan read-only and
-   apply behind an independently approved GitHub environment.
-5. Use a fine-grained GitHub token or GitHub App installation token authorized for
+5. Give the Azure apply identity the scoped rights required to manage the resources in
+   this root. Keep plan read-only and apply behind an independently approved GitHub
+   environment.
+6. Use a fine-grained GitHub token or GitHub App installation token authorized for
    the target organization with these organization permissions:
    - `Administration: write` for the GitHub-hosted runner pool.
    - `Network configurations: write` for APN network configuration CRUD.
    - `Self-hosted runners: write` for the runner-group API, which is shared by
      self-hosted and GitHub-hosted larger runners.
-6. Store that token as a protected environment secret. Map it to both `GITHUB_TOKEN`
+7. Store that token as a protected environment secret. Map it to both `GITHUB_TOKEN`
    for the Terraform GitHub provider and `GH_TOKEN` for the REST bridge. The token is
    inherited by the process and is never a Terraform variable, output, or state value.
 
@@ -218,11 +220,11 @@ plan removes this root's runner pool, network configuration, Azure NetworkSettin
 VNet, and NSGs. The bridge refuses to delete a same-named network configuration if it
 no longer references this state's NetworkSettings ID.
 
-This root also owns the subscription's `GitHub.Network` provider registration, so its
-destroy unregisters that provider. If the subscription contains another APN deployment,
-move registration ownership to the shared subscription bootstrap before adopting this
-root. Do not destroy shared route tables, Firewall policy, DNS, Private Endpoints,
-backends, identities, or log destinations from this state.
+This root does not own the subscription's `GitHub.Network` provider registration.
+Keep that singleton in the shared subscription bootstrap so destroying one environment
+cannot break another APN deployment. Do not destroy shared route tables, Firewall
+policy, DNS, Private Endpoints, backends, identities, provider registrations, or log
+destinations from this state.
 
 ## Authoritative references
 

@@ -2,10 +2,6 @@ data "azurerm_resource_group" "runner" {
   name = var.resource_group_name
 }
 
-resource "azurerm_resource_provider_registration" "github_network" {
-  name = "GitHub.Network"
-}
-
 module "runner_nsg" {
   # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.5.1 release returned by the Terraform Registry.
   source  = "Azure/avm-res-network-networksecuritygroup/azurerm"
@@ -65,8 +61,6 @@ resource "azapi_resource" "github_network_settings" {
   }
   schema_validation_enabled = false
   tags                      = local.common_tags
-
-  depends_on = [azurerm_resource_provider_registration.github_network]
 
   lifecycle {
     ignore_changes = [tags["GitHubId"]]

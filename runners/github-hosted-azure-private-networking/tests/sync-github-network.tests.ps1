@@ -38,14 +38,12 @@ $createApi = {
         }
         "POST /orgs/example-org/settings/network-configurations" {
             return [pscustomobject]@{
-                id                   = "network-config-123"
-                name                 = $Body.name
-                compute_service      = $Body.compute_service
-                network_settings_ids = $Body.network_settings_ids
+                id   = "network-config-123"
+                name = $Body.name
             }
         }
         "GET /orgs/example-org/actions/runner-groups/42" {
-            return [pscustomobject]@{ id = 42; name = "ghrg-example-eus-prd"; network_configuration_id = $null }
+            return [pscustomobject]@{ id = 42; name = "ghrg-example-eus-prd" }
         }
         "PATCH /orgs/example-org/actions/runner-groups/42" {
             return [pscustomobject]@{ id = 42; name = $Body.name; network_configuration_id = $Body.network_configuration_id }

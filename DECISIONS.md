@@ -25,7 +25,9 @@ provider 6.13.0. The repository owner authorized this generic, un-applied refere
 2026-08-31; every consuming VNet, subnet, route, endpoint, identity, and GitHub scope
 remains an explicit environment decision before deployment. `GitHub.Network`
 registration remains in the subscription bootstrap, never a copied per-environment
-root whose destroy could unregister the provider for another APN deployment.
+root whose destroy could unregister the provider for another APN deployment. A
+same-named GitHub network configuration is not adoption authority: the bridge creates
+an absent object or verifies an exact owner match, and fails closed on any mismatch.
 
 ### 2026-08-14 — Publication diagnostics collect evidence without naming the cause
 The private Foundry client flow includes a read-only collector for PNA, network

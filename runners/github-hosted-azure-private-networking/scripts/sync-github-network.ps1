@@ -161,12 +161,8 @@ function Invoke-ApnMain {
         else {
             $settingsIds = @(Get-ObjectPropertyValue -InputObject $configuration -Name "network_settings_ids")
             $computeService = Get-ObjectPropertyValue -InputObject $configuration -Name "compute_service"
-            $matchesDesiredState = $computeService -eq "actions" -and
-                $settingsIds.Count -eq 1 -and $settingsIds[0] -eq $networkSettingsId
-
-            if (-not $matchesDesiredState) {
-                $configurationIdPath = [Uri]::EscapeDataString([string]$configuration.id)
-                $configuration = & $ApiInvoker "PATCH" "/orgs/$organizationPath/settings/network-configurations/$configurationIdPath" $configurationBody $false
+            if ($computeService -ne "actions" -or $settingsIds.Count -ne 1 -or $settingsIds[0] -ne $networkSettingsId) {
+                throw "Refusing to adopt '$configurationName' because its compute service or NetworkSettings ID belongs to another configuration."
             }
         }
 

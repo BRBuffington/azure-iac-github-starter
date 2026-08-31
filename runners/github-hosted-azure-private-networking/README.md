@@ -166,8 +166,10 @@ that missing association through GitHub REST API version `2026-03-10`.
 The bridge:
 
 - lists every network configuration and selects one exact name;
-- creates or updates one `compute_service=actions` configuration with one Azure
-  NetworkSettings ID;
+- creates one missing `compute_service=actions` configuration with one Azure
+  NetworkSettings ID, or verifies an existing exact match;
+- refuses to adopt or overwrite a same-named configuration with another compute
+  service or NetworkSettings ID;
 - reads the runner group and patches its required `name` plus the network configuration
   ID only when the binding differs;
 - treats an identical repeat as a no-op;

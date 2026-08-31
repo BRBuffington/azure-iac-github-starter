@@ -83,6 +83,42 @@ $noopApi = {
 Invoke-ApnMain -ApiInvoker $noopApi
 Assert-Equal -Actual $noopCalls.Count -Expected 2 -Message "No-op path call count"
 
+foreach ($foreignConfiguration in @(
+    [pscustomobject]@{
+        id                   = "network-config-foreign-settings"
+        name                 = "ghnet-example-eus-prd"
+        compute_service      = "actions"
+        network_settings_ids = @("azure-settings-foreign")
+    },
+    [pscustomobject]@{
+        id                   = "network-config-foreign-service"
+        name                 = "ghnet-example-eus-prd"
+        compute_service      = "codespaces"
+        network_settings_ids = @("azure-settings-123")
+    }
+)) {
+    Set-TestEnvironment -Mode Ensure
+    $driftCalls = [System.Collections.Generic.List[object]]::new()
+    $driftApi = {
+        param($Method, $Path, $Body, $AllowNotFound)
+        $driftCalls.Add([pscustomobject]@{ Method = $Method; Path = $Path; Body = $Body; AllowNotFound = $AllowNotFound })
+        return [pscustomobject]@{ network_configurations = @($foreignConfiguration) }
+    }
+
+    $driftRejected = $false
+    try {
+        Invoke-ApnMain -ApiInvoker $driftApi
+    }
+    catch {
+        $driftRejected = $_.Exception.Message -like "Refusing to adopt*"
+    }
+
+    if (-not $driftRejected) {
+        throw "Ensure mode must reject a same-named network configuration with ownership drift."
+    }
+    Assert-Equal -Actual $driftCalls.Count -Expected 1 -Message "Ownership-drift path call count"
+}
+
 Set-TestEnvironment -Mode Remove
 $removeCalls = [System.Collections.Generic.List[object]]::new()
 $removeApi = {

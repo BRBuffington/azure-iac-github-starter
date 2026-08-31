@@ -21,7 +21,9 @@ GitHub-hosted larger runners attached through Azure Private Networking. Keep eac
 implementation in its existing runner owner and one environment per state. The APN
 reference uses AVM networking and AzAPI for `GitHub.Network/networkSettings`; a narrow,
 idempotent REST bridge owns only the hosted-compute association missing from GitHub
-provider 6.13.0.
+provider 6.13.0. The repository owner authorized this generic, un-applied reference on
+2026-08-31; every consuming VNet, subnet, route, endpoint, identity, and GitHub scope
+remains an explicit environment decision before deployment.
 
 ### 2026-08-14 — Publication diagnostics collect evidence without naming the cause
 The private Foundry client flow includes a read-only collector for PNA, network

@@ -8,6 +8,11 @@ Networking (APN).
 > a backend, validated, security-scanned, and tested with mock providers. It has
 > not been applied to Azure or GitHub.
 
+> Authorization boundary: the repository owner authorized this reusable template on
+> 2026-08-31. That approval does not authorize a customer deployment or a new VNet,
+> subnet, route, endpoint, identity, or GitHub scope. A consuming architecture owner
+> must explicitly approve those environment-specific resources before plan/apply.
+
 Copy this directory as one independent root per environment. Give each copy its
 own Azure subscription, backend key, runner VNet, GitHub network configuration,
 runner group, workload identities, and protected GitHub environment. Do not put

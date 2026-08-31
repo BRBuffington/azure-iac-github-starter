@@ -119,13 +119,13 @@ function Invoke-ApnMain {
 
     $organizationPath = [Uri]::EscapeDataString($organization)
     $configurations = @(Get-NetworkConfigurations -ApiInvoker $ApiInvoker -OrganizationPath $organizationPath)
-    $matches = @($configurations | Where-Object { $_.name -ceq $configurationName })
+    $matchingConfigurations = @($configurations | Where-Object { $_.name -ceq $configurationName })
 
-    if ($matches.Count -gt 1) {
+    if ($matchingConfigurations.Count -gt 1) {
         throw "More than one network configuration is named '$configurationName'."
     }
 
-    $configuration = if ($matches.Count -eq 1) { $matches[0] } else { $null }
+    $configuration = if ($matchingConfigurations.Count -eq 1) { $matchingConfigurations[0] } else { $null }
     $runnerGroupPath = "/orgs/$organizationPath/actions/runner-groups/$runnerGroupId"
 
     if ($mode -eq "Ensure") {

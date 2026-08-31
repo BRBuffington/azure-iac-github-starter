@@ -10,16 +10,7 @@ dependency_subnet_cidr          = "10.40.1.0/24"
 route_table_resource_id         = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-connectivity-eus-prd/providers/Microsoft.Network/routeTables/rt-runners-eus-prd"
 dns_servers                     = ["10.0.0.4", "10.0.0.5"]
 
-approved_private_dependencies = {
-  terraform_state_blob = {
-    destination_address_prefixes = ["10.40.1.4/32"]
-    destination_port_ranges      = ["443"]
-  }
-  container_registry = {
-    destination_address_prefixes = ["10.40.1.5/32", "10.40.1.6/32"]
-    destination_port_ranges      = ["443"]
-  }
-}
+approved_private_dependencies = {}
 
 github_organization             = "example-org"
 github_organization_database_id = "12345678"

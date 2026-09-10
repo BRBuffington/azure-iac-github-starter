@@ -15,6 +15,12 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-09-10 - Use the personal GitHub MCP for this repository
+The repository owner confirmed standing authorization to use the configured personal
+GitHub MCP for this repository. Select that identity directly for platform operations
+and its matching process-scoped credential for native Git network operations; do not
+ask for renewed identity-selection approval on routine repository work.
+
 ### 2026-09-10 - Keep the attended APN walkthrough separate from Terraform
 The requested Matt Allford-style PowerShell walkthrough reuses an existing resource
 group, VNet, empty subnet, and reviewed NSG, with current NetworkSettings and GitHub

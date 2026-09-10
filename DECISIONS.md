@@ -15,6 +15,13 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-09-10 - Keep the attended APN walkthrough separate from Terraform
+The requested Matt Allford-style PowerShell walkthrough reuses an existing resource
+group, VNet, empty subnet, and reviewed NSG, with current NetworkSettings and GitHub
+handoff guidance. It omits the old static-IP Bicep rules and destructive cleanup;
+the Terraform root and REST association bridge remain unchanged. This is an
+operator-run teaching companion, not authorization to deploy or dual-manage resources.
+
 ### 2026-08-31 — Organization APN derives numeric GitHub identifiers
 The organization-scoped APN root accepts the GitHub organization login and repository
 names, then derives the organization `databaseId` and repository IDs through the pinned

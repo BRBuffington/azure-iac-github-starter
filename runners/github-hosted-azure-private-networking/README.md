@@ -18,6 +18,11 @@ own Azure subscription, backend key, runner VNet, GitHub network configuration,
 runner group, workload identities, and protected GitHub environment. Do not put
 nonproduction and production in one state or select between them at runtime.
 
+For a small attended setup using existing resources, see the separate
+[PowerShell walkthrough](walkthrough/README.md), adapted from Matt Allford's demo
+and checked against current Azure and GitHub documentation. It does not replace or
+modify this Terraform implementation; do not use both against the same resources.
+
 ## What this root manages
 
 | Plane | Managed resource or operation |

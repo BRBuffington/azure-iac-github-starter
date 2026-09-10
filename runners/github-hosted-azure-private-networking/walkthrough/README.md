@@ -92,21 +92,6 @@ steps; inspect the reported step before retrying.
    then perform one intended OIDC-authorized operation without printing secret values.
    Validate the required denied paths before using it for privileged work.
 
-## What changed from the older demo
-
-| Item | Current treatment |
-| --- | --- |
-| Hardcoded account and resource values | Required input parameters; no customer identifiers or credentials |
-| Region and subnet ARM ID | Read from the existing VNet/subnet instead of composed assumptions |
-| Static GitHub IP Bicep template | Not copied. Current GitHub guidance recommends domain-based egress using `https://api.github.com/meta`; the old static lists are not maintained |
-| Demo Internet-deny workaround | Not copied. Reuse the reviewed NSG and existing egress policy without changing rules |
-| NetworkSettings API | `2024-04-02` remains the latest documented Azure version and the version in GitHub's current setup guide |
-| PowerShell JSON escaping | Serialize once to a temporary UTF-8 file and use Azure CLI's documented `--properties @file --is-full-object` input |
-| Provider registration | Wait for registration before subnet delegation |
-| GitHub enterprise setup | Match the configuration scope and numeric ID; organizations can create configurations when enterprise policy allows |
-| NIC visibility | Do not depend on seeing a NIC in the customer subscription; GitHub documents movement to service-subscription NICs using addresses from your subnet |
-| Cleanup | No resource-group deletion command. Follow GitHub's documented detach/NetworkSettings removal order if teardown is separately approved |
-
 ## Offline validation
 
 ```powershell

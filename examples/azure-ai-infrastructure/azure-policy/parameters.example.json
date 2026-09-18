@@ -1,0 +1,12 @@
+{
+  "allowedLocations": { "value": ["<deployment-region>"] },
+  "ownerTagName": { "value": "Owner" },
+  "costCenterTagName": { "value": "CostCenter" },
+  "environmentTagName": { "value": "Environment" },
+  "classificationTagName": { "value": "DataClassification" },
+  "provenanceTagName": { "value": "DeployedByRepo" },
+  "locationsEffect": { "value": "Deny" },
+  "networkEffect": { "value": "Deny" },
+  "localAuthEffect": { "value": "Deny" },
+  "transportEffect": { "value": "Deny" }
+}

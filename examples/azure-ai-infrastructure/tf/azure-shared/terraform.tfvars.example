@@ -1,0 +1,25 @@
+subscription_id   = "00000000-0000-0000-0000-000000000000"
+tenant_id         = "11111111-1111-1111-1111-111111111111"
+resource_group_id = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-network"
+scope             = "aidemo"
+region_alias      = "eus"
+environment       = "dev"
+location          = "eastus"
+
+vnet_address_space            = "10.40.0.0/22"
+agent_subnet_cidr             = "10.40.0.0/24"
+private_endpoint_subnet_cidr  = "10.40.1.0/24"
+hub_vnet_resource_id          = "/subscriptions/22222222-2222-2222-2222-222222222222/resourceGroups/rg-hub/providers/Microsoft.Network/virtualNetworks/vnet-hub"
+dns_server_ips                = ["10.10.0.4"]
+firewall_private_ip            = "10.10.1.4"
+approved_client_cidrs          = ["10.20.1.0/24", "10.20.2.0/24"]
+cosmos_direct_endpoint_ips     = []
+agent_nsg_resource_id          = null
+private_endpoint_nsg_resource_id = null
+agent_route_table_resource_id  = null
+
+deployed_by_repo = "example-org/azure-network-reference"
+tags = {
+  Owner      = "platform-team"
+  CostCenter = "example"
+}

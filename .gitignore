@@ -21,6 +21,10 @@ infra/backend.hcl
 *.tfvars.local
 .env
 
+# Private configuration for the copyable AI infrastructure examples
+examples/azure-ai-infrastructure/**/terraform.tfvars
+examples/azure-ai-infrastructure/**/configs/*.tfvars
+
 # Python (the .github/scripts helpers)
 __pycache__/
 *.pyc

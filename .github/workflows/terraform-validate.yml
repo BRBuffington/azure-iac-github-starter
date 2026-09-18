@@ -280,6 +280,10 @@ jobs:
       - name: IaC security scan (Checkov)
         run: python "${GITHUB_WORKSPACE}/.github/scripts/checkov_fail_closed.py" --directory "${GITHUB_WORKSPACE}/${{ matrix.directory }}"
 
+      - name: Report infrastructure scan findings on failure
+        if: ${{ failure() && startsWith(matrix.option, 'infrastructure-') }}
+        run: checkov --directory "${GITHUB_WORKSPACE}/${{ matrix.directory }}" --framework terraform --quiet --compact
+
       - name: terraform init (no backend)
         run: terraform init -input=false -backend=false
         working-directory: ${{ matrix.directory }}

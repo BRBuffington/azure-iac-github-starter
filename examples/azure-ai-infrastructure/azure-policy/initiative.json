@@ -1,0 +1,141 @@
+{
+  "name": "azure-ai-poc",
+  "type": "Microsoft.Authorization/policySetDefinitions",
+  "properties": {
+    "displayName": "Private Azure AI POC infrastructure guardrails",
+    "description": "A scoped starter composition of Microsoft built-ins for resource locations, resource-group tags, private networking, Entra authentication and Storage transport. Review inherited assignments before adoption. This is not a Microsoft-published initiative or a compliance certification.",
+    "policyType": "Custom",
+    "metadata": {
+      "category": "AI infrastructure",
+      "version": "1.0.0",
+      "source": "https://github.com/BRBuffington/azure-iac-github-starter",
+      "builtInsReviewedOn": "2026-09-18"
+    },
+    "parameters": {
+      "allowedLocations": {
+        "type": "Array",
+        "metadata": {
+          "displayName": "Customer-selected deployment regions",
+          "description": "Supply regions selected after checking Foundry model/tool support, private networking, capacity and residency. No region is selected by this initiative.",
+          "strongType": "location"
+        }
+      },
+      "ownerTagName": { "type": "String", "defaultValue": "Owner" },
+      "costCenterTagName": { "type": "String", "defaultValue": "CostCenter" },
+      "environmentTagName": { "type": "String", "defaultValue": "Environment" },
+      "classificationTagName": { "type": "String", "defaultValue": "DataClassification" },
+      "provenanceTagName": { "type": "String", "defaultValue": "DeployedByRepo" },
+      "locationsEffect": {
+        "type": "String",
+        "allowedValues": ["Audit", "Deny", "Disabled"],
+        "defaultValue": "Deny"
+      },
+      "networkEffect": {
+        "type": "String",
+        "allowedValues": ["Audit", "Deny", "Disabled"],
+        "defaultValue": "Deny"
+      },
+      "localAuthEffect": {
+        "type": "String",
+        "allowedValues": ["Audit", "Deny", "Disabled"],
+        "defaultValue": "Deny"
+      },
+      "transportEffect": {
+        "type": "String",
+        "allowedValues": ["Audit", "Deny", "Disabled"],
+        "defaultValue": "Deny"
+      }
+    },
+    "policyDefinitions": [
+      {
+        "policyDefinitionReferenceId": "AllowedResourceLocations",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/e56962a6-4747-49cd-b67b-bf8b01975c4c",
+        "parameters": {
+          "listOfAllowedLocations": { "value": "[parameters('allowedLocations')]" },
+          "effect": { "value": "[parameters('locationsEffect')]" }
+        }
+      },
+      {
+        "policyDefinitionReferenceId": "AllowedResourceGroupLocations",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/e765b5de-1225-4ba3-bd56-1ac6695af988",
+        "parameters": {
+          "listOfAllowedLocations": { "value": "[parameters('allowedLocations')]" },
+          "effect": { "value": "[parameters('locationsEffect')]" }
+        }
+      },
+      {
+        "policyDefinitionReferenceId": "RequireResourceGroupOwner",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/96670d01-0a4d-4649-9c89-2d3abc0a5025",
+        "parameters": { "tagName": { "value": "[parameters('ownerTagName')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "RequireResourceGroupCostCenter",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/96670d01-0a4d-4649-9c89-2d3abc0a5025",
+        "parameters": { "tagName": { "value": "[parameters('costCenterTagName')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "RequireResourceGroupEnvironment",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/96670d01-0a4d-4649-9c89-2d3abc0a5025",
+        "parameters": { "tagName": { "value": "[parameters('environmentTagName')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "RequireResourceGroupClassification",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/96670d01-0a4d-4649-9c89-2d3abc0a5025",
+        "parameters": { "tagName": { "value": "[parameters('classificationTagName')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "RequireResourceGroupProvenance",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/96670d01-0a4d-4649-9c89-2d3abc0a5025",
+        "parameters": { "tagName": { "value": "[parameters('provenanceTagName')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "FoundryAndSearchDisableLocalAuth",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/71ef260a-8f18-47b7-abcb-62d0673d94dc",
+        "parameters": { "effect": { "value": "[parameters('localAuthEffect')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "FoundryAndSearchRestrictNetwork",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/037eea7a-bd0a-46c5-9a66-03aea78705d3",
+        "parameters": { "effect": { "value": "[parameters('networkEffect')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "SearchDisablePublicNetwork",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/ee980b6d-0eca-4501-8d54-f6290fd512c3",
+        "parameters": { "effect": { "value": "[parameters('networkEffect')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "StorageDisablePublicNetwork",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/b2982f36-99f2-4db5-8eff-283140c09693",
+        "parameters": { "effect": { "value": "[parameters('networkEffect')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "CosmosDisablePublicNetwork",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/797b37f7-06b8-444c-b1ad-fc62867f335a",
+        "parameters": { "effect": { "value": "[parameters('networkEffect')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "StorageDisableSharedKey",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/8c6a50c6-9ffd-4ae7-986f-5fa6111f9a54",
+        "parameters": { "effect": { "value": "[parameters('localAuthEffect')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "CosmosDisableLocalAuth",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/5450f5bd-9c72-4390-a9c4-a7aba4edfdd2",
+        "parameters": { "effect": { "value": "[parameters('localAuthEffect')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "StorageSecureTransfer",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/404c3081-a854-4457-ae30-26a93ef643f9",
+        "parameters": { "effect": { "value": "[parameters('transportEffect')]" } }
+      },
+      {
+        "policyDefinitionReferenceId": "StorageMinimumTls12",
+        "policyDefinitionId": "/providers/Microsoft.Authorization/policyDefinitions/fe83a0eb-a853-422d-aac2-1bffd182c5d0",
+        "parameters": {
+          "minimumTlsVersion": { "value": "TLS1_2" },
+          "effect": { "value": "[parameters('transportEffect')]" }
+        }
+      }
+    ]
+  }
+}

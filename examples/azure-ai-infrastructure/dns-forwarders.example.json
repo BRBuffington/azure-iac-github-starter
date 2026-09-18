@@ -1,0 +1,18 @@
+{
+  "description": "Configuration handoff for the existing enterprise DNS owner, not an Azure deployment template. Replace the example inbound resolver addresses.",
+  "targetDnsServers": ["10.10.0.4", "10.10.0.5"],
+  "port": 53,
+  "protocols": ["UDP", "TCP"],
+  "conditionalForwarders": [
+    { "domainName": "cognitiveservices.azure.com.", "privateZoneName": "privatelink.cognitiveservices.azure.com" },
+    { "domainName": "openai.azure.com.", "privateZoneName": "privatelink.openai.azure.com" },
+    { "domainName": "services.ai.azure.com.", "privateZoneName": "privatelink.services.ai.azure.com" },
+    { "domainName": "blob.core.windows.net.", "privateZoneName": "privatelink.blob.core.windows.net" },
+    { "domainName": "documents.azure.com.", "privateZoneName": "privatelink.documents.azure.com" },
+    { "domainName": "search.windows.net.", "privateZoneName": "privatelink.search.windows.net" }
+  ],
+  "privateZoneLink": {
+    "virtualNetworkId": "<existing-Azure-resolver-vnet-resource-id>",
+    "registrationEnabled": false
+  }
+}

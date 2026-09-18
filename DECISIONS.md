@@ -15,6 +15,14 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-09-18 - Keep infrastructure references separate from application publication
+The Azure AI infrastructure examples follow shared/network versus workload state
+ownership, with an optional spoke and a private Foundry foundation that consumes
+existing platform IDs. Their empty HTTP backend preserves an adopting team's internal
+GitLab state convention; it is an explicit example-specific exception, not a change
+to this starter's Azure backend or deployment workflows. They are generic un-applied
+references, and neither the council advice nor mock tests authorize deployment.
+
 ### 2026-09-10 - Use the personal GitHub MCP for this repository
 The repository owner confirmed standing authorization to use the configured personal
 GitHub MCP for this repository. Select that identity directly for platform operations

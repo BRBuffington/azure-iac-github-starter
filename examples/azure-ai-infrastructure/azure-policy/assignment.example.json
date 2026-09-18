@@ -1,0 +1,16 @@
+{
+  "name": "azure-ai-poc",
+  "type": "Microsoft.Authorization/policyAssignments",
+  "properties": {
+    "displayName": "Private Azure AI POC infrastructure guardrails",
+    "description": "Non-enforcing evaluation at the approved POC scope. Replace placeholders, review inherited assignments and approve enforcement separately.",
+    "scope": "/providers/Microsoft.Management/managementGroups/<poc-management-group-id>",
+    "policyDefinitionId": "/providers/Microsoft.Management/managementGroups/<definition-management-group-id>/providers/Microsoft.Authorization/policySetDefinitions/azure-ai-poc",
+    "enforcementMode": "DoNotEnforce",
+    "notScopes": [],
+    "parameters": {},
+    "nonComplianceMessages": [
+      { "message": "Use the approved deployment regions, resource-group tags, network restrictions, Entra authentication and Storage HTTPS/TLS settings for this POC." }
+    ]
+  }
+}

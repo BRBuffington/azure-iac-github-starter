@@ -1,4 +1,5 @@
 module "resource_group" {
+  # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.4.0 release.
   source  = "Azure/avm-res-resources-resourcegroup/azurerm"
   version = "0.4.0"
 
@@ -9,6 +10,7 @@ module "resource_group" {
 }
 
 module "ai_foundry" {
+  # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.11.3 release.
   source  = "Azure/avm-ptn-aiml-ai-foundry/azurerm"
   version = "0.11.3"
 

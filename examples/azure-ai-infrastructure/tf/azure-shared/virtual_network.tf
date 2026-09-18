@@ -1,4 +1,5 @@
 module "spoke" {
+  # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.22.2 release.
   source  = "Azure/avm-res-network-virtualnetwork/azurerm"
   version = "0.22.2"
 

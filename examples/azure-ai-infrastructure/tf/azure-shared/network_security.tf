@@ -1,4 +1,5 @@
 module "network_security_group" {
+  # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.5.1 release.
   for_each = local.network_security_groups
   source   = "Azure/avm-res-network-networksecuritygroup/azurerm"
   version  = "0.5.1"
@@ -12,6 +13,7 @@ module "network_security_group" {
 }
 
 module "agent_route_table" {
+  # checkov:skip=CKV_TF_1:Official AVM Registry module pinned to the exact 0.5.0 release.
   for_each = local.route_tables
   source   = "Azure/avm-res-network-routetable/azurerm"
   version  = "0.5.0"

@@ -6,6 +6,8 @@ import pathlib
 import tempfile
 import unittest
 
+import yaml
+
 _SCRIPT = pathlib.Path(__file__).with_name("checkov_fail_closed.py")
 _SPEC = importlib.util.spec_from_file_location("checkov_fail_closed", _SCRIPT)
 assert _SPEC and _SPEC.loader
@@ -117,6 +119,47 @@ class AuthoredTerraformFilesTests(unittest.TestCase):
             ]
 
             self.assertEqual(relative_paths, ["main.tf", "modules/child.tf"])
+
+
+class WorkflowScanDiagnosticsTests(unittest.TestCase):
+    def setUp(self):
+        workflow_path = _SCRIPT.parents[1] / "workflows" / "terraform-validate.yml"
+        workflow = yaml.safe_load(workflow_path.read_text(encoding="utf-8"))
+        self.job = workflow["jobs"]["validate-foundry-agent-teams-option"]
+        self.scan = next(
+            step for step in self.job["steps"]
+            if step.get("name") == "IaC security scan (Checkov)"
+        )
+        self.diagnostics = next(
+            step for step in self.job["steps"]
+            if step.get("name") == "Report infrastructure scan findings on failure"
+        )
+
+    def test_diagnostics_require_the_owning_scan_to_fail(self):
+        self.assertEqual(
+            self.diagnostics["if"],
+            "${{ failure() && steps."
+            + self.scan["id"]
+            + ".outcome == 'failure' && startsWith(matrix.option, 'infrastructure-') }}",
+        )
+
+    def test_infrastructure_filter_covers_the_target_roots(self):
+        self.assertEqual(
+            {
+                entry["directory"]
+                for entry in self.job["strategy"]["matrix"]["include"]
+                if entry["option"].startswith("infrastructure-")
+            },
+            {
+                "examples/azure-ai-infrastructure/tf/azure-ai",
+                "examples/azure-ai-infrastructure/tf/azure-shared",
+            },
+        )
+
+    def test_scan_failure_remains_blocking(self):
+        self.assertNotIn("continue-on-error", self.scan)
+        self.assertNotIn("continue-on-error", self.job)
+        self.assertIn("checkov_fail_closed.py", self.scan["run"])
 
 
 if __name__ == "__main__":

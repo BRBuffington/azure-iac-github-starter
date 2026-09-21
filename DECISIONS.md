@@ -15,6 +15,14 @@ accumulating decisions and the gotchas you hit along the way.
 Newest first. One entry per decision: `### YYYY-MM-DD — summary`, then 1–3
 sentences of *why*.
 
+### 2026-09-20 - Validate composed storage names and attribute scan diagnostics
+The infrastructure AI root rejects invalid composed storage names at its existing
+input boundary without truncating or normalizing names; the Terraform 1.12 minimum
+already supports the cross-variable validation. Infrastructure scan diagnostics run
+only when their own blocking Checkov step fails, not after unrelated failures.
+Both sanitized tfvars samples retain `DataClassification = "ReviewRequired"` as a
+placeholder for the adopter's approved classification, not an approval itself.
+
 ### 2026-09-18 - Keep infrastructure references separate from application publication
 The Azure AI infrastructure examples follow shared/network versus workload state
 ownership, with an optional spoke and a private Foundry foundation that consumes

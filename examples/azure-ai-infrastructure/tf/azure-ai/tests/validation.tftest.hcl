@@ -157,3 +157,52 @@ run "reject_shared_subnet" {
 
   expect_failures = [var.private_endpoint_subnet_resource_id]
 }
+
+run "accept_storage_name_at_24_characters" {
+  command = plan
+
+  variables {
+    scope        = "example"
+    region_alias = "eastus"
+    environment  = "prd"
+    name_suffix  = "sample"
+  }
+
+  assert {
+    condition     = local.storage_configuration.runtime.name == "stexampleeastusprdsample" && length(local.storage_configuration.runtime.name) == 24
+    error_message = "A valid 24-character composed storage name must pass without truncation or normalization."
+  }
+}
+
+run "reject_storage_name_over_24_characters" {
+  command = plan
+
+  variables {
+    scope        = "example"
+    region_alias = "eastusa"
+    environment  = "prd"
+    name_suffix  = "sample"
+  }
+
+  expect_failures = [var.name_suffix]
+}
+
+run "reject_uppercase_region_in_storage_name" {
+  command = plan
+
+  variables {
+    region_alias = "EUS"
+  }
+
+  expect_failures = [var.name_suffix]
+}
+
+run "reject_punctuation_in_storage_name" {
+  command = plan
+
+  variables {
+    environment = "pre-prd"
+  }
+
+  expect_failures = [var.name_suffix]
+}

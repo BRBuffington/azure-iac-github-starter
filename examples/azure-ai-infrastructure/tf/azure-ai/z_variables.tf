@@ -41,6 +41,11 @@ variable "name_suffix" {
     condition     = can(regex("^[a-z0-9]{4,6}$", var.name_suffix))
     error_message = "Use 4-6 lowercase alphanumeric characters, not a timestamp."
   }
+
+  validation {
+    condition     = can(regex("^[a-z0-9]{3,24}$", "st${var.scope}${var.region_alias}${var.environment}${var.name_suffix}"))
+    error_message = "The storage name composed from st, scope, region_alias, environment and name_suffix must be 3-24 lowercase letters or numbers. Shorten the inputs or remove invalid characters."
+  }
 }
 
 variable "agent_subnet_resource_id" {

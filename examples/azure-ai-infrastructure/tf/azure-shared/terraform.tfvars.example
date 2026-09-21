@@ -20,6 +20,7 @@ agent_route_table_resource_id  = null
 
 deployed_by_repo = "example-org/azure-network-reference"
 tags = {
-  Owner      = "platform-team"
-  CostCenter = "example"
+  Owner              = "platform-team"
+  CostCenter         = "example"
+  DataClassification = "ReviewRequired"
 }
